@@ -1,0 +1,28 @@
+{
+  "name": "@sentinel/mcp",
+  "version": "0.1.0",
+  "description": "Sentinel's agent-facing surface: MCP server (Streamable HTTP) and A2A agent with the Verified by Concordium badge",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "lint": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@a2a-js/sdk": "^1.3.0",
+    "@hono/node-server": "^1.13.0",
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "@sentinel/agents": "0.1.0",
+    "@sentinel/concordium": "0.1.0",
+    "@sentinel/engine": "0.1.0",
+    "hono": "^4.6.0",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0",
+    "vitest": "^5.0.5"
+  }
+}
