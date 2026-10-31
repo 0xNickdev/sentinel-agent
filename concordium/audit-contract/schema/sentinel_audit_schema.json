@@ -1,0 +1,29 @@
+{
+  "contractName": "sentinel_audit",
+  "entrypoints": {
+    "count": {
+      "returnValue": "BQ=="
+    },
+    "info": {
+      "returnValue": "FAADAAAABQAAAGFkbWluCwoAAABzdWJtaXR0ZXJzEAILBQAAAGNvdW50BQ=="
+    },
+    "record": {
+      "error": "FQYAAAALAAAAUGFyc2VQYXJhbXMCBwAAAExvZ0Z1bGwCDAAAAFVuYXV0aG9yaXplZAIIAAAATm90Rm91bmQCBwAAAFRvb0xvbmcCDAAAAEludmFsaWRTY29yZQI=",
+      "parameter": "FAAHAAAABgAAAGRpZ2VzdBMgAAAAAgUAAABjaGFpbhYCBwAAAHN1YmplY3QWAgcAAAB2ZXJkaWN0FgIKAAAAcmlza19zY29yZQIJAAAAYWdlbnRfaWRzEAIFCwAAAG9ic2VydmVkX2F0BQ==",
+      "returnValue": "BQ=="
+    },
+    "setSubmitter": {
+      "error": "FQYAAAALAAAAUGFyc2VQYXJhbXMCBwAAAExvZ0Z1bGwCDAAAAFVuYXV0aG9yaXplZAIIAAAATm90Rm91bmQCBwAAAFRvb0xvbmcCDAAAAEludmFsaWRTY29yZQI=",
+      "parameter": "FAACAAAABwAAAGFjY291bnQLBwAAAGFsbG93ZWQB"
+    },
+    "view": {
+      "error": "FQYAAAALAAAAUGFyc2VQYXJhbXMCBwAAAExvZ0Z1bGwCDAAAAFVuYXV0aG9yaXplZAIIAAAATm90Rm91bmQCBwAAAFRvb0xvbmcCDAAAAEludmFsaWRTY29yZQI=",
+      "parameter": "BQ==",
+      "returnValue": "FAAJAAAABgAAAGRpZ2VzdBMgAAAAAgUAAABjaGFpbhYCBwAAAHN1YmplY3QWAgcAAAB2ZXJkaWN0FgIKAAAAcmlza19zY29yZQIJAAAAYWdlbnRfaWRzEAIFCwAAAG9ic2VydmVkX2F0BQsAAAByZWNvcmRlZF9hdA0JAAAAc3VibWl0dGVyCw=="
+    }
+  },
+  "event": "FQIAAAAHAAAAVmVyZGljdAAIAAAAAwAAAHNlcQUGAAAAZGlnZXN0EyAAAAACBQAAAGNoYWluFgIHAAAAc3ViamVjdBYCBwAAAHZlcmRpY3QWAgoAAAByaXNrX3Njb3JlAgkAAABhZ2VudF9pZHMQAgUJAAAAc3VibWl0dGVyCxAAAABTdWJtaXR0ZXJDaGFuZ2VkAAIAAAAHAAAAYWNjb3VudAsHAAAAYWxsb3dlZAE=",
+  "init": {
+    "parameter": "FAABAAAACgAAAHN1Ym1pdHRlcnMQAgs="
+  }
+}

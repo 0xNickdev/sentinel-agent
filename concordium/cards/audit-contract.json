@@ -1,0 +1,14 @@
+{
+  "network": "testnet",
+  "moduleRef": "d5579f583b00b8212c82438adb39963bfc56e257159ff3f32fb56396fc1504f7",
+  "deployTx": "cb735156acd3ce2a8a0f2e2fa8931d07ec4109964372b908890a55ccb8f7ec33",
+  "initTx": "793299013c7f1d7c8ab429664911905ccf9c6a77208a3b677cb70b1630f25d64",
+  "contract": {
+    "index": 13039,
+    "subindex": 0
+  },
+  "submitters": [
+    "4Q6F8vgX8ESuH5B6kY47oZYssBFRea37ad4wE9Drx71HexJdvL"
+  ],
+  "explorer": "https://testnet.ccdscan.io/contracts/13039/0"
+}
