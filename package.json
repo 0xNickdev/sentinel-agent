@@ -1,0 +1,21 @@
+{
+  "name": "sentinel",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Accountable anti-rug agent swarm on Concordium",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm test --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present"
+  },
+  "workspaces": [
+    "engine",
+    "agents",
+    "concordium",
+    "mcp",
+    "web"
+  ]
+}
