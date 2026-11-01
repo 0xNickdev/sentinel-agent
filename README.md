@@ -4,17 +4,42 @@
 
 Every incumbent sells a score. Sentinel sells a record you can hold against what happened: `GET /track`, MCP `sentinel_track`.
 
-Built for the Encode × Concordium "Make your Agents Accountable" hackathon (Nov–Dec 2026).
+Built for the Encode × Concordium Trusted Agents hackathon (Nov–Dec 2026).
+
+## Live
+
+| | |
+|---|---|
+| Site | https://sentinelagent.pro |
+| API (gateway, MCP `/mcp`, A2A `/a2a`, x402 `/x402/verdict`, track `/track`) | https://api.sentinelagent.pro |
+| Audit contract (verdicts + outcome grades), testnet | [`<13039,0>`](https://testnet.ccdscan.io/contracts/13039/0) |
+| Agent Registry (CIS-8004 `<12802,0>`), testnet | tokens 981–989, all nine badges valid ([registry.json](concordium/cards/registry.json)) |
+| Verdict signatures | ML-DSA-65, public key at https://api.sentinelagent.pro/.well-known/sentinel-keys.json |
+
+| Agent | Token | Badge token address |
+|---|---|---|
+| Sentinel (gateway) | 981 | `JyP9XuYWbM5LAuY1BXBRN` |
+| Judge | 982 | `JyP9XvdzXNaG12mhEPWxc` |
+| Holders | 983 | `JyP9XwjUTQ5BqA1U88GxH` |
+| Snipers & Bundles | 984 | `JyP9XxpxPRa7fHFHdSi8f` |
+| Funding Graph | 985 | `JyP9XyvSKT53VQV4eCrRY` |
+| Creator | 986 | `JyP9Y11vFUZyKXirwTVGZ` |
+| Contract & Liquidity | 987 | `JyP9Y27QBW4u9exdA4hkR` |
+| Market | 988 | `JyP9Y3Ct7XZpynCTKGUka` |
+| Money Flow | 989 | `JyP9Y4JN3Z4kouSAhLdSi` |
+
+Check any badge yourself: `GET https://agent-registry-mcp.concordium.com/v1/check-badge/JyP9XuYWbM5LAuY1BXBRN?network=testnet`, or the hosted MCP tool `check_badge`.
 
 ```
  agent / bot ──MCP · A2A · HTTP──▶ Sentinel gateway ──x402 (CCD, sponsored tx)──▶ paid
                                         │
                                         ├── engine: deterministic evidence from Solana mainnet (holders, snipers, bundles,
-                                        │           funding graph, creator, authorities, market)
-                                        ├── swarm: 6 specialists (Haiku) + judge (Opus), veto + weighted consensus, debate
-                                        ├── Agent Registry (CIS-8004): 8 Agent Cards, Verified by Concordium badges
-                                        ├── audit contract (Rust): sha256(verdict) appended, EU AI Act Art. 12
+                                        │           funding graph, creator, authorities, market, money flow)
+                                        ├── swarm: 7 specialists + council + advocate + judge, vetoes, weighted consensus
+                                        ├── Agent Registry (CIS-8004): 9 Agent Cards, Verified by Concordium badges
+                                        ├── audit contract (Rust): sha256(verdict) appended before the outcome
                                         │     └── grades: outcome at 1h/24h/7d appended beside the verdict (resolver)
+                                        ├── sampler: judges random live pump.fun launches so the track is not cherry-picked
                                         └── Concordium ID: verified-human creator proof (planned)
 ```
 
@@ -22,11 +47,15 @@ Built for the Encode × Concordium "Make your Agents Accountable" hackathon (Nov
 
 | Package | What | State |
 |---|---|---|
-| `engine/` | Chain-agnostic signals, Solana RPC adapter, Dexscreener market adapter, money-flow trace, launch feed (Shyft gRPC), outcome grading + proper scoring | Runs on mainnet; 31 tests |
+| `engine/` | Chain-agnostic signals, Solana RPC adapter, Dexscreener market adapter, money-flow trace, launch feed (Yellowstone gRPC), outcome grading + proper scoring | Runs on mainnet; 32 tests |
 | `agents/` | Swarm orchestrator (7 specialists, debate, anonymous council, advocate, judge), consensus with vetoes, ML-DSA-65 attestation, CLI | Live verdicts: LIBRA → RUGGED, BONK → SAFE; 29 tests |
-| `concordium/` | Registry client + Agent Cards, audit contract (Rust) + client, verdict track resolver, x402 gateway/facilitator/payer | Live on testnet: contract `<13039,0>`, first paid verdict anchored; 13 + 4 tests |
-| `mcp/` | MCP server, A2A agent, composed product server, paying MCP client demo | End-to-end with real models; 4 tests |
-| `web/` | Showcase site: live swarm over SSE, verdict stamp, agent cards with badges, audit explorer with in-browser signature verification, docs | Builds; runs against the API |
+| `concordium/` | Registry client + Agent Cards, audit contract (Rust) + client, verdict track resolver, launch sampler, x402 gateway/facilitator/payer, demo trader agent | Live on testnet; 14 + 4 tests |
+| `mcp/` | MCP server, A2A agent, composed product server | Deployed on Railway; 7 tests |
+| `web/` | Site: live swarm over SSE, verdict stamp, agent cards with badges, audit explorer with in-browser signature verification, track record, docs | Deployed on Vercel |
+
+### An agent that asks before it buys
+
+`node concordium/dist/scripts/trader-agent.js [mint]` is the scenario end to end: a trading agent reads Sentinel's Agent Card, checks its Verified by Concordium badge against the registry, pays 1 CCD over x402 (sponsored, no gas), and buys only a SAFE call it is reasonably sure of. It never trades; it prints the decision and the Concordium record of the call it acted on.
 
 ## Run it
 
