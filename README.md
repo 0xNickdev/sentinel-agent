@@ -45,17 +45,17 @@ Sentinel publishes how its past calls turned out.
 ```mermaid
 flowchart LR
     A["Trading agent"] -- "MCP · A2A · HTTP" --> G["Sentinel gateway"]
-    G -- "402 → pay 1 CCD" --> X["x402 facilitator<br/>sponsored tx"]
+    G -->|402 → pay 1 CCD| X["x402 facilitator<br/>sponsored tx"]
     G --> E["Engine<br/>deterministic evidence<br/>from Solana mainnet"]
     E --> S["7 specialists"]
     S --> C["Council<br/>anonymous peer ranking"]
     C --> K["Consensus<br/>vetoes + weighted mean"]
     K --> D["Advocate<br/>argues the other side"]
     D --> J["Judge"]
-    J -- "verdict + evidence" --> A
-    J -- "sha256 · ML-DSA-65" --> R[("Audit contract<br/>Concordium")]
-    R -. "1h · 24h · 7d" .-> V["Resolver<br/>grades the outcome"]
-    V -- "grade" --> R
+    J -->|verdict + evidence| A
+    J -->|sha256 · ML-DSA-65| R[("Audit contract<br/>Concordium")]
+    R -.->|1h · 24h · 7d| V["Resolver<br/>grades the outcome"]
+    V -->|grade| R
     V --> T["Track record<br/>Brier · calibration"]
 ```
 
@@ -88,11 +88,11 @@ sequenceDiagram
 ```mermaid
 flowchart LR
     J(["Judged<br/>swarm decides"]) --> S[("Sealed<br/>digest on Concordium<br/>never edited")]
-    S -- "+1h" --> G1["Graded 1h"]
-    G1 -- "+24h" --> G2["Graded 24h"]
-    G2 -- "+7d" --> G3["Graded 7d"]
+    S -->|+1h| G1["Graded 1h"]
+    G1 -->|+24h| G2["Graded 24h"]
+    G2 -->|+7d| G3["Graded 7d"]
     G3 --> SC(["Scored<br/>Brier · log score · calibration"])
-    G1 -. "grade appended beside the record" .-> S
+    G1 -.->|grade appended beside the record| S
     G2 -.-> S
     G3 -.-> S
 ```
