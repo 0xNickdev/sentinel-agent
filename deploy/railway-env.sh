@@ -13,7 +13,7 @@ for line in open('.env'):
     env[k.strip()] = v.split(' #')[0].strip().strip('"').strip("'")
 # Only what the API needs. The owner and payer keys stay on this machine: the server receives payments at the owner
 # address (CONCORDIUM_PAY_TO) and never signs as the owner.
-want = ['ANTHROPIC_API_KEY', 'SOLANA_RPC_URL', 'SHYFT_GRPC_URL', 'SHYFT_GRPC_TOKEN', 'SENTINEL_PQ_SEED', 'CONCORDIUM_NETWORK', 'CONCORDIUM_NODE',
+want = ['ANTHROPIC_API_KEY', 'SOLANA_RPC_URL', 'SOLANA_RPC_URL_SHYFT', 'SHYFT_GRPC_URL', 'SHYFT_GRPC_TOKEN', 'SENTINEL_PQ_SEED', 'CONCORDIUM_NETWORK', 'CONCORDIUM_NODE',
         'CONCORDIUM_SUBMITTER_ADDRESS', 'CONCORDIUM_SUBMITTER_KEY', 'CONCORDIUM_SPONSOR_ADDRESS', 'CONCORDIUM_SPONSOR_KEY',
         'SENTINEL_JUDGE_EFFORT', 'SENTINEL_SPECIALIST_MODEL', 'SENTINEL_JUDGE_MODEL']
 sets = {k: env[k] for k in want if env.get(k)}

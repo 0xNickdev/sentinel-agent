@@ -71,7 +71,7 @@ export function bootstrapFromEnv(root: string, log: (m: string) => void = m => c
     try { launchFeed = new LaunchFeed({ url: process.env.SHYFT_GRPC_URL, token: process.env.SHYFT_GRPC_TOKEN, log }); } catch (e) { log(`launch · feed disabled: ${e instanceof Error ? e.message : String(e)}`); }
   } else log('launch · off (set SHYFT_GRPC_URL and SHYFT_GRPC_TOKEN for the live launch feed)');
 
-  const service = new VerdictService({ rpcUrl: process.env.SOLANA_RPC_URL ?? 'https://api.mainnet-beta.solana.com', audit, dataDir, launchFeed, log });
+  const service = new VerdictService({ rpcUrl: process.env.SOLANA_RPC_URL ?? 'https://api.mainnet-beta.solana.com', fallbackRpcUrl: process.env.SOLANA_RPC_URL_FALLBACK || process.env.SOLANA_RPC_URL_SHYFT || null, audit, dataDir, launchFeed, log });
 
   // Demo snapshots: pre-warmed TokenSnapshot JSON files so the demo never waits on RPC.
   const seedDir = process.env.SENTINEL_SEED_SNAPSHOTS;

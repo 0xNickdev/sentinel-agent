@@ -12,6 +12,8 @@ import type { Network } from './registry.js';
 
 export interface VerdictServiceOptions {
   rpcUrl: string;
+  /** a second RPC tried when the first refuses (401/403/429): keeps verdicts flowing when a provider key runs out */
+  fallbackRpcUrl?: string | null;
   llm?: LLM;
   audit?: { client: AuditClient; submitter: Account; agentIds: number[]; network: Network } | null;
   /** directory for verdicts.jsonl and snapshot cache; memory-only when omitted */
@@ -40,6 +42,7 @@ export class VerdictService {
   private readonly byDigest = new Map<string, StoredVerdict>();
   private readonly byMint = new Map<string, StoredVerdict>();
   private readonly adapter: SolanaAdapter;
+  private readonly fallback: SolanaAdapter | null;
   private readonly llm: LLM;
   private readonly file: string | null;
   private readonly outcomesFile: string | null;
@@ -53,6 +56,7 @@ export class VerdictService {
     this.keys = o.keys ? { ...o.keys, ephemeral: false } : keysFromEnv();
     if (this.keys.ephemeral) o.log?.('attest · SENTINEL_PQ_SEED not set: using an ephemeral ML-DSA-65 key (signatures valid for this process only)');
     this.adapter = new SolanaAdapter({ rpcUrl: o.rpcUrl, log: m => o.log?.(`engine · ${m}`) });
+    this.fallback = o.fallbackRpcUrl && o.fallbackRpcUrl !== o.rpcUrl ? new SolanaAdapter({ rpcUrl: o.fallbackRpcUrl, log: m => o.log?.(`engine (fallback rpc) · ${m}`) }) : null;
     this.llm = o.llm ?? new AnthropicLLM();
     this.file = o.dataDir ? join(o.dataDir, 'verdicts.jsonl') : null;
     this.outcomesFile = o.dataDir ? join(o.dataDir, 'outcomes.jsonl') : null;
@@ -88,7 +92,16 @@ export class VerdictService {
   async snapshot(mint: string): Promise<TokenSnapshot> {
     const cached = this.snapshots.get(mint);
     if (cached) return cached;
-    const s = await this.adapter.snapshot(mint);
+    let s: TokenSnapshot;
+    try {
+      s = await this.adapter.snapshot(mint);
+    } catch (e) {
+      // A provider that refuses (expired key, exhausted credits, rate limit) should not take verdicts down with it.
+      const msg = e instanceof Error ? e.message : String(e);
+      if (!this.fallback || !/\b(401|403|429)\b|Forbidden|Unauthorized|Too Many/i.test(msg)) throw e;
+      this.o.log?.(`engine · primary rpc refused (${msg.slice(0, 60)}); retrying on the fallback rpc`);
+      s = await this.fallback.snapshot(mint);
+    }
     this.snapshots.set(mint, s);
     return s;
   }
