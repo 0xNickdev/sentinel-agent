@@ -44,7 +44,7 @@ Sentinel publishes how its past calls turned out.
 
 ```mermaid
 flowchart LR
-    A["Trading agent"] -- "MCP · A2A · HTTP" --> G["Sentinel gateway"]
+    A["Trading agent"] -->|MCP · A2A · HTTP| G["Sentinel gateway"]
     G -->|402 → pay 1 CCD| X["x402 facilitator<br/>sponsored tx"]
     G --> E["Engine<br/>deterministic evidence<br/>from Solana mainnet"]
     E --> S["7 specialists"]
