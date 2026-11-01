@@ -13,6 +13,7 @@ const app = sentinelApp({ service: b.service, cardsDir: b.cardsDir, network: b.n
 // Hosts such as Railway assign the port through PORT.
 const port = Number(process.env.SENTINEL_GATEWAY_PORT ?? process.env.PORT ?? 4020);
 b.resolver?.start();
+b.sampler?.start();
 serve({ fetch: app.fetch, port }, () => {
   b.log(`sentinel · http://localhost:${port} · public ${b.baseUrl}`);
   b.log(`  MCP  ${b.baseUrl}/mcp${b.paywall ? ` (sentinel_verdict paid: ${Number(b.paywall.priceMicroCcd) / 1e6} CCD)` : ' (free)'}`);

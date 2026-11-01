@@ -7,3 +7,4 @@ export * from './gateway.js';
 export * from './service.js';
 export * from './bootstrap.js';
 export * from './track.js';
+export * from './sampler.js';

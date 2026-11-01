@@ -9,6 +9,7 @@ import { loadEnv } from '@sentinel/agents';
 import { LaunchFeed, type TokenSnapshot } from '@sentinel/engine';
 import { AuditClient } from './audit.js';
 import { Resolver } from './track.js';
+import { LaunchSampler } from './sampler.js';
 import { accountFromEnv, nodeClient } from './chain.js';
 import type { Network } from './registry.js';
 import { VerdictService } from './service.js';
@@ -27,6 +28,8 @@ export interface Bootstrap {
   corsOrigins: string[];
   /** grades sealed verdicts against outcomes at fixed horizons; null when SENTINEL_RESOLVER=0 */
   resolver: Resolver | null;
+  /** judges random live launches on a clock to feed the track; null unless SENTINEL_SAMPLER_EVERY_MIN is set */
+  sampler: LaunchSampler | null;
   log: (m: string) => void;
 }
 
@@ -84,6 +87,12 @@ export function bootstrapFromEnv(root: string, log: (m: string) => void = m => c
     ...(process.env.SENTINEL_RESOLVE_HORIZONS ? { horizons: process.env.SENTINEL_RESOLVE_HORIZONS.split(',').map(Number).filter(n => n > 0) } : {}),
   });
   if (!resolver) log('resolve · off (SENTINEL_RESOLVER=0)');
+  // Sampler: unbiased calls for the track. Costs model tokens per run, so it is opt-in with a daily cap.
+  const everyMin = Number(process.env.SENTINEL_SAMPLER_EVERY_MIN ?? 0);
+  const sampler = everyMin > 0 && launchFeed
+    ? new LaunchSampler({ service, everyMin, perDay: Number(process.env.SENTINEL_SAMPLER_PER_DAY ?? 48), log })
+    : null;
+  log(sampler ? `sample · on: one launch every ${everyMin} min, at most ${process.env.SENTINEL_SAMPLER_PER_DAY ?? 48}/day` : 'sample · off (set SENTINEL_SAMPLER_EVERY_MIN to judge live launches for the track)');
   const corsOrigins = (process.env.SENTINEL_CORS_ORIGINS ?? 'http://localhost:3000,http://localhost:3100').split(',').map(s => s.trim()).filter(Boolean);
-  return { network, baseUrl, cardsDir, dataDir, service, paywall, facilitatorUrl, audit: Boolean(audit), corsOrigins, resolver, log };
+  return { network, baseUrl, cardsDir, dataDir, service, paywall, facilitatorUrl, audit: Boolean(audit), corsOrigins, resolver, sampler, log };
 }
