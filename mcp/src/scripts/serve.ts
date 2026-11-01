@@ -10,7 +10,8 @@ import { sentinelApp } from '../app.js';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const b = bootstrapFromEnv(root);
 const app = sentinelApp({ service: b.service, cardsDir: b.cardsDir, network: b.network, baseUrl: b.baseUrl, paywall: b.paywall, corsOrigins: b.corsOrigins, log: b.log });
-const port = Number(process.env.SENTINEL_GATEWAY_PORT ?? 4020);
+// Hosts such as Railway assign the port through PORT.
+const port = Number(process.env.SENTINEL_GATEWAY_PORT ?? process.env.PORT ?? 4020);
 b.resolver?.start();
 serve({ fetch: app.fetch, port }, () => {
   b.log(`sentinel · http://localhost:${port} · public ${b.baseUrl}`);

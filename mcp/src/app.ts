@@ -51,7 +51,10 @@ export function sentinelApp(o: SentinelAppOptions): Hono {
   // REST twin of the sentinel_agents tool for the showcase site.
   app.get('/api/agents', c => c.json({ network: o.network, agents: agentDirectory(mcpOpts), price: o.paywall ? { microCcd: o.paywall.priceMicroCcd, payTo: o.paywall.payTo } : null, attestation: { alg: 'ML-DSA-65', publicKey: o.service.keys.publicKeyHex } }));
   mountMcp(app, '/mcp', mcpOpts);
-  mountA2A(app, ['/a2a', '/.well-known/agent-card.json'], mcpOpts, badgeExtension(existsSync(gatewayCard) ? readFileSync(gatewayCard, 'utf8') : null));
+  // A2A JSON-RPC lives at /a2a (GET there returns the live A2A card). /.well-known/agent-card.json is the registered card,
+  // served byte-exact by the gateway below: the registry pins its sha256, so nothing may generate it on the fly.
+  mountA2A(app, ['/a2a'], mcpOpts, badgeExtension(existsSync(gatewayCard) ? readFileSync(gatewayCard, 'utf8') : null));
+  if (!existsSync(gatewayCard)) mountA2A(app, ['/.well-known/agent-card.json'], mcpOpts, null);
   // The gateway serves GET /.well-known/agent-card.json (registry card, byte-exact) and x402 + verdict listing routes.
   app.route('/', gatewayApp({ cardsDir: o.cardsDir, service: o.service, paywall: o.paywall ?? null, ...(o.publicStream === undefined ? {} : { publicStream: o.publicStream }), ...(o.log ? { log: o.log } : {}) }));
   return app;
