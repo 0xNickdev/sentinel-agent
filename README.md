@@ -86,18 +86,15 @@ sequenceDiagram
 ### The life of a verdict
 
 ```mermaid
-stateDiagram-v2
-    [*] --> Judged: swarm decides
-    Judged --> Sealed: digest recorded on Concordium
-    Sealed --> Graded_1h: market re-read at +1h
-    Graded_1h --> Graded_24h: +24h
-    Graded_24h --> Graded_7d: +7d
-    Graded_7d --> Scored: Brier, log score, calibration
-    Scored --> [*]
-    note right of Sealed
-        never edited:
-        grades are appended beside it
-    end note
+flowchart LR
+    J(["Judged<br/>swarm decides"]) --> S[("Sealed<br/>digest on Concordium<br/>never edited")]
+    S -- "+1h" --> G1["Graded 1h"]
+    G1 -- "+24h" --> G2["Graded 24h"]
+    G2 -- "+7d" --> G3["Graded 7d"]
+    G3 --> SC(["Scored<br/>Brier · log score · calibration"])
+    G1 -. "grade appended beside the record" .-> S
+    G2 -.-> S
+    G3 -.-> S
 ```
 
 ## The swarm
