@@ -24,7 +24,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
 ENV NODE_ENV=production SENTINEL_DATA_DIR=/data
 WORKDIR /app
 COPY --from=build /app /app
-RUN mkdir -p /data && chown -R node:node /data
-USER node
+# Railway mounts the volume at /data owned by root after the image is built, so ownership set here does not
+# survive the mount: the entrypoint fixes it, then drops to the unprivileged node user.
+RUN apt-get update && apt-get install -y --no-install-recommends gosu && rm -rf /var/lib/apt/lists/* && mkdir -p /data
 EXPOSE 4020
-CMD ["node", "mcp/dist/scripts/serve.js"]
+CMD ["sh", "-c", "chown -R node:node /data && exec gosu node node mcp/dist/scripts/serve.js"]
