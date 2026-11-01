@@ -1,0 +1,16 @@
+.env
+.env.*
+!.env.example
+**/node_modules
+**/dist
+**/.next
+web/src
+web/public
+concordium/keys
+concordium/data
+concordium/cards/dry-run
+concordium/audit-contract/target
+**/*.export
+.git
+.claude
+docs

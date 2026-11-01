@@ -3,8 +3,8 @@
 #
 #   cloudflared tunnel login
 #   cloudflared tunnel create sentinel
-#   cloudflared tunnel route dns sentinel api.santinelguard.online
-#   cloudflared tunnel route dns sentinel santinelguard.online
+#   cloudflared tunnel route dns sentinel api.sentinelagent.pro
+#   cloudflared tunnel route dns sentinel sentinelagent.pro
 #   cloudflared tunnel run sentinel
 #
 # The credentials file is written by `tunnel create`; never copy it into this repo.
@@ -14,14 +14,14 @@ credentials-file: /Users/<you>/.cloudflared/<TUNNEL_ID>.json
 
 ingress:
   # API: gateway + MCP + A2A + x402 (node mcp/dist/scripts/serve.js, SENTINEL_GATEWAY_PORT=4020)
-  - hostname: api.santinelguard.online
+  - hostname: api.sentinelagent.pro
     service: http://localhost:4020
     originRequest:
       connectTimeout: 30s
       keepAliveTimeout: 90s
 
   # Site: Next.js (`npm run start -w web`, port 3100)
-  - hostname: santinelguard.online
+  - hostname: sentinelagent.pro
     service: http://localhost:3100
 
   - service: http_status:404
