@@ -127,15 +127,15 @@ The rule is code, and it can overrule the judge.
 
 ```mermaid
 flowchart TD
-    F["7 findings: score s, confidence c, weight w"] --> Q{"spread > 35?"}
-    Q -- yes --> DB["one debate round<br/>for the outliers"]
-    Q -- no --> CO
+    F["7 findings: score s, confidence c, weight w"] --> Q{"spread above 35?"}
+    Q -->|yes| DB["one debate round<br/>for the outliers"]
+    Q -->|no| CO
     DB --> CO["council: each model ranks the others anonymously<br/>w × (0.7 + 0.6 × peer score)"]
     CO --> M["weighted mean Σ w·c·s / Σ w·c"]
     M --> V{"any veto?"}
-    V -- yes --> FL["floor at DANGER"]
-    V -- no --> B["bands: SAFE < 35 ≤ CAUTION < 65 ≤ DANGER"]
-    FL --> J["judge may move the score ±20,<br/>RUGGED only with exit evidence"]
+    V -->|yes| FL["floor at DANGER"]
+    V -->|no| B["bands: SAFE below 35, CAUTION 35 to 64, DANGER 65 and up"]
+    FL --> J["judge may move the score by up to 20 points<br/>RUGGED only with exit evidence"]
     B --> J
 ```
 
