@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { ago, getJSON, type VerdictSummary } from "@/lib/api";
 
-/** "last verdict 14s ago", ticking. */
+/** "Last verdict 14s ago", ticking. */
 export function LiveTicker() {
   const [last, setLast] = useState<number | null>(null);
   const [, tick] = useState(0);
@@ -15,5 +15,5 @@ export function LiveTicker() {
     return () => { alive = false; clearInterval(a); clearInterval(b); };
   }, []);
   if (last == null) return null;
-  return <span className="text-fg-4">last verdict <span className="text-fg-2">{ago(last)}</span></span>;
+  return <span className="hidden lg:inline mono text-fg-3">last verdict <span className="display-num text-fg">{ago(last)}</span></span>;
 }

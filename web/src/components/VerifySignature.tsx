@@ -18,13 +18,13 @@ export function VerifySignature({ verdict, signature }: { verdict: { mint: strin
       setState(keys?.attestation?.publicKey && keys.attestation.publicKey !== signature.publicKey ? "unknown-key" : "ok");
     } catch (e) { setErr(e instanceof Error ? e.message : String(e)); setState("bad"); }
   }
-  const msg = { idle: "", busy: "verifying…", ok: "signature valid · key matches /.well-known/sentinel-keys.json", bad: "SIGNATURE INVALID", "unknown-key": "valid, but signed by a different key than the one published" }[state];
   return (
-    <span className="inline-flex flex-wrap gap-x-2">
-      <button type="button" onClick={verify} disabled={state === "busy"} className="act">[{state === "busy" ? "verifying" : "verify"}]</button>
-      <span className="text-fg-4">{signature.alg} (FIPS 204) · sha256(digest ‖ mint ‖ verdict ‖ score ‖ at) · ctx sentinel.verdict/1</span>
-      {msg && <span className={state === "ok" ? "text-fg" : "text-red"}>{msg}</span>}
-      {err && <span className="text-red">{err}</span>}
-    </span>
+    <div className="flex flex-wrap items-center gap-3">
+      <button onClick={verify} disabled={state === "busy"} className={`pill ${state === "ok" ? "" : state === "bad" ? "pill-red" : "pill-ghost"}`}>
+        {state === "idle" && "Verify signature in browser"}{state === "busy" && "Verifying…"}{state === "ok" && "Signature valid · key matches"}{state === "bad" && "Signature invalid"}{state === "unknown-key" && "Valid, but signed by a different key"}
+      </button>
+      <span className="mono text-xs text-fg-3">{signature.alg} (FIPS 204) over sha256(digest ‖ mint ‖ verdict ‖ score ‖ at)</span>
+      {err && <span className="mono text-xs text-red">{err}</span>}
+    </div>
   );
 }

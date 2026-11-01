@@ -1,9 +1,10 @@
 @import "tailwindcss";
 
-/* Sentinel terminal tokens: black, Geist Mono everywhere, Doto only for the wordmark and the verdict word, one red. */
+/* Sentinel tokens: black, dot-matrix display type, one red, white pills. */
 :root {
   --bg: #000;
   --bg-1: #0a0a0a;
+  --bg-2: #111;
   --line: #1f1f1f;
   --line-2: #2e2e2e;
   --fg: #fff;
@@ -11,11 +12,21 @@
   --fg-3: #7a7a7a;
   --fg-4: #4a4a4a;
   --red: #ff2a2a;
+  --red-hi: #ff5a4d;
+  --red-lo: #7a0f0f;
+  --red-glow: rgba(255, 42, 42, 0.14);
+  --pill-bg: #fff;
+  --pill-fg: #000;
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out-quart: cubic-bezier(0.76, 0, 0.24, 1);
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-snap: cubic-bezier(0.2, 0.9, 0.1, 1);
 }
 
 @theme inline {
   --color-bg: var(--bg);
   --color-bg-1: var(--bg-1);
+  --color-bg-2: var(--bg-2);
   --color-line: var(--line);
   --color-line-2: var(--line-2);
   --color-fg: var(--fg);
@@ -23,63 +34,63 @@
   --color-fg-3: var(--fg-3);
   --color-fg-4: var(--fg-4);
   --color-red: var(--red);
+  --color-red-hi: var(--red-hi);
+  --color-red-lo: var(--red-lo);
   --font-display: var(--font-doto), ui-monospace, monospace;
-  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-sans: var(--font-geist-sans), system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 }
 
 html { color-scheme: dark; background: var(--bg); }
-body { background: var(--bg); color: var(--fg-2); font-family: var(--font-mono); font-size: 13px; line-height: 20px; -webkit-font-smoothing: antialiased; font-variant-numeric: tabular-nums; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
 ::selection { background: var(--red); color: #000; }
-a { color: inherit; }
-input, button { font: inherit; color: inherit; }
-button { background: none; border: 0; padding: 0; cursor: pointer; }
 
-/* Doto, square dots: wordmark and verdict word only. */
+/* Display type: Doto, square dots (ROND 0), forensic weight. */
 .display { font-family: var(--font-display); font-variation-settings: "ROND" 0; font-weight: 800; letter-spacing: -0.01em; line-height: 0.9; }
+.display-num { font-family: var(--font-display); font-variation-settings: "ROND" 0; font-weight: 500; font-variant-numeric: tabular-nums; }
 
-/* Verdict bands: CLEAN white, RISKY outlined red, DANGER/RUGGED solid red. Never green. */
+/* Pills */
+.pill { display: inline-flex; align-items: center; gap: 0.5rem; height: 40px; padding: 0 1.1rem; border-radius: 999px; background: var(--pill-bg); color: var(--pill-fg); font-weight: 500; font-size: 14px; line-height: 1; white-space: nowrap; transition: transform 0.12s var(--ease-snap), background 0.2s; }
+.pill:hover { transform: scale(1.02); }
+.pill:active { transform: scale(0.97); }
+.pill-ghost { background: transparent; color: var(--fg); border: 1px solid var(--line-2); }
+.pill-ghost:hover { border-color: var(--fg-3); }
+.pill-red { background: var(--red); color: #000; }
+.pill-wrap { white-space: normal; height: auto; min-height: 40px; padding: 8px 1.1rem; text-align: center; }
+.dot { width: 6px; height: 6px; border-radius: 999px; background: var(--red); display: inline-block; }
+
+/* Verdict bands: CLEAN white on black, RISKY outlined red, RUG solid red. Never green. */
 .band-SAFE { color: var(--fg); }
-.band-CAUTION { color: transparent; -webkit-text-stroke: 1.5px var(--red); }
+.band-CAUTION { color: var(--red); -webkit-text-stroke: 1px var(--red); }
 .band-DANGER, .band-RUGGED { color: var(--red); }
+.tile-SAFE { border-color: var(--line-2); }
+.tile-CAUTION { border-color: var(--red-lo); }
+.tile-DANGER, .tile-RUGGED { border-color: var(--red); background: linear-gradient(180deg, rgba(255,42,42,0.08), transparent 60%); }
 
-/* Bracketed actions: [verify] [copy] — the only interactive affordance. */
-.act { color: var(--fg-2); white-space: nowrap; }
-.act:hover { color: var(--fg); }
-.act[aria-current="page"], .act.on { color: var(--fg); }
-.act:disabled { color: var(--fg-4); cursor: default; }
-.act-primary { background: var(--fg); color: #000; padding: 0 6px; }
-.act-primary:hover { background: var(--red); color: #000; }
-.act-primary:disabled { background: var(--line-2); color: var(--fg-4); }
+/* Scan sweep for pending text */
+@keyframes sweep { from { background-position: -200% 0; } to { background-position: 200% 0; } }
+.shimmer { background: linear-gradient(90deg, var(--fg-3) 0%, var(--fg-3) 40%, var(--red) 50%, var(--fg-3) 60%, var(--fg-3) 100%); background-size: 200% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: sweep 1.6s linear infinite; }
 
-/* Uppercase section labels and ASCII rules. */
-.label { color: var(--fg-3); text-transform: uppercase; letter-spacing: 0.04em; }
-.rule { color: var(--line-2); overflow: hidden; white-space: nowrap; user-select: none; min-width: 0; }
+/* Dot grid backdrop */
+.dots { background-image: radial-gradient(var(--line-2) 1px, transparent 1.2px); background-size: 24px 24px; }
+
 .hairline { border-top: 1px solid var(--line); }
-
-/* Fixed-width tables, ls -l style. */
-.tt { border-collapse: collapse; }
-.tt th { text-align: left; font-weight: 400; color: var(--fg-3); text-transform: uppercase; letter-spacing: 0.04em; padding: 0 16px 4px 0; border-bottom: 1px solid var(--line); white-space: nowrap; }
-.tt td { padding: 2px 16px 2px 0; vertical-align: top; white-space: nowrap; border-bottom: 1px solid var(--line); }
-.tt th:last-child, .tt td:last-child { padding-right: 0; }
-.tt td.wrap { white-space: normal; min-width: 14rem; }
-.tt tr.row:hover td { background: var(--bg-1); }
-.tt-wrap { overflow-x: auto; }
-
-/* Log lines: [time] source › text */
-.log { display: grid; grid-template-columns: 10ch 11ch 1fr; column-gap: 1ch; }
-.log > .t { color: var(--fg-4); }
-.log > .s { color: var(--fg-3); white-space: nowrap; overflow: hidden; }
-.log > .x { color: var(--fg-2); overflow-wrap: anywhere; }
-
-/* The only motion: a blinking cursor, appended lines, a short verdict stamp. */
-@keyframes blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
-.cursor { display: inline-block; width: 0.6em; height: 1.1em; background: var(--fg); vertical-align: text-bottom; animation: blink 1s steps(1) infinite; }
-.cursor-red { background: var(--red); }
-@keyframes stamp { from { opacity: 0; transform: scale(1.12); } to { opacity: 1; transform: none; } }
-.stamp { animation: stamp 0.18s cubic-bezier(0.16, 1, 0.3, 1) both; transform-origin: left center; }
-@keyframes appear { from { opacity: 0; } to { opacity: 1; } }
-.appear { animation: appear 0.12s linear both; }
+.mono { font-family: var(--font-mono); font-size: 13px; }
 
 @media (prefers-reduced-motion: reduce) {
-  .cursor, .stamp, .appear { animation: none !important; }
+  *, *::before, *::after { animation-duration: 0.15s !important; transition-duration: 0.15s !important; }
+  .shimmer { animation: none; color: var(--fg-3); }
 }
+
+/* Tables (track record, audit list): mono, hairlines, no chrome. */
+.tt-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.tt { width: 100%; border-collapse: collapse; font-family: var(--font-mono); font-size: 12px; }
+.tt th { text-align: left; font-weight: 500; color: var(--fg-4); padding: 0 12px 10px 0; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.tt td { padding: 10px 12px 10px 0; border-bottom: 1px solid var(--line); white-space: nowrap; vertical-align: baseline; }
+.tt tr.row { transition: background 0.15s; }
+.tt tr.row:hover { background: var(--bg-1); }
+
+/* Launch rows rise in as they land. */
+@keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.launch-row { animation: rise 0.5s var(--ease-out-expo) both; }
+

@@ -1,84 +1,84 @@
 import { CopyButton } from "@/components/CopyButton";
-import { Label } from "@/components/term/Log";
 import { serverApi, type AgentsResponse } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
 
 const MCP_CONFIG = `{
   "mcpServers": {
-    "sentinel": { "type": "http", "url": "https://<sentinel-host>/mcp" }
+    "sentinel": {
+      "type": "http",
+      "url": "https://<sentinel-host>/mcp"
+    }
   }
 }`;
-const PROMPT = `Before trading any Solana token, call sentinel_verdict with its mint. Treat DANGER or RUGGED as a hard stop. Quote the risk score, the confidence and the top reason to the user, and link the audit record.`;
+const PROMPT = `Before trading any Solana token, call sentinel_verdict with its mint. Treat DANGER or RUGGED as a hard stop. Quote the risk score, the confidence and the top reason to the user, and link the audit record. Check sentinel_track once per session to know how well the judge has been calibrated lately.`;
 const TOOLS: Array<[string, string, string]> = [
-  ["sentinel_verdict", "{ mint, fresh? }", "full swarm verdict: band, risk, confidence, reasons, dissent, vetoes, findings, consensus, flags, attestation (digest, Concordium tx, ML-DSA-65 signature). paid over x402 when the server has a paywall. streams progress notifications."],
-  ["sentinel_agents", "{}", "the agents: roles, registry token ids, badge addresses, badge-check URLs, Agent Card URLs."],
-  ["sentinel_check_badge", "{ id }", "verify any Concordium agent badge or list an account's badges via the Agent Registry."],
-  ["sentinel_audit", "{ digest? | mint? | limit? }", "past verdicts with their on-chain audit records."],
-  ["sentinel_track", "{ limit? }", "the track record: Brier, skill vs base rate, reliability, per specialist; graded verdicts with their grade anchors."],
+  ["sentinel_verdict", "{ mint, fresh? }", "Full swarm verdict: band, risk, confidence, headline, decisive fact, action, reasons, clean signals, what would change it, scorecard, advocate and rebuttal, vetoes, findings, consensus, flags, evidence incl. money flow, attestation (digest, Concordium tx, ML-DSA-65 signature). Paid over x402 when the server has a paywall. Streams progress notifications."],
+  ["sentinel_agents", "{}", "The nine agents: roles, registry token ids, badge addresses, badge-check URLs, Agent Card URLs."],
+  ["sentinel_check_badge", "{ id }", "Verify any Concordium agent badge or list an account's badges via the Agent Registry."],
+  ["sentinel_audit", "{ digest? | mint? | limit? }", "Past verdicts with their on-chain audit records and outcomes."],
+  ["sentinel_track", "{ limit? }", "The track record: Brier, skill vs base rate, log score, reliability bins, per specialist; graded verdicts with their grade anchors."],
 ];
 const A2A = `POST /a2a\nA2A-Version: 1.0\n\n{"jsonrpc":"2.0","id":1,"method":"SendStreamingMessage","params":{"message":{"messageId":"m1","role":"ROLE_USER","parts":[{"data":{"mint":"Bo9jh3wsmcC2AjakLWzNmKJ3SgtZmXEcSaW7L2FAvUsU"}}]}}}\n\n→ task · statusUpdate (one per specialist) · artifactUpdate { verdict } · statusUpdate COMPLETED`;
-const AUDIT = `sentinel_audit.record { digest: [u8;32], chain, subject, verdict, risk_score: u8, agent_ids: [u64], observed_at: u64 } → seq\nsentinel_audit.view(seq) → Record · count() · info()\nsentinel_audit.grade  { seq, horizon: u32, labels, rugged, liquidity_bps: u16, price_bps: u16, observed_at } (once per horizon; the record is never edited)\nsentinel_audit.grades(seq) → [Grade]`;
+const AUDIT = `sentinel_audit.record { digest: [u8;32], chain, subject, verdict, risk_score: u8, agent_ids: [u64], observed_at: u64 } → seq\nsentinel_audit.view(seq) → Record · count() · info()\nsentinel_audit.grade  { seq, horizon: u32, labels, rugged, liquidity_bps: u16, price_bps: u16, observed_at }\n                      (once per horizon; the record itself is never edited)\nsentinel_audit.grades(seq) → [Grade]`;
+const SECTIONS = ["01 MCP", "02 Tools", "03 A2A", "04 x402", "05 Audit", "06 Track", "07 Verify"];
 
-/** man sentinel */
 export default async function DocsPage() {
   const a = await fetch(`${serverApi()}/api/agents`, { cache: "no-store" }).then(r => (r.ok ? (r.json() as Promise<AgentsResponse>) : null)).catch(() => null);
   const price = a?.price ? `${Number(a.price.microCcd) / 1e6} CCD` : "1 CCD";
   const payTo = a?.price?.payTo ?? "<owner account>";
-  const X402 = `POST /x402/verdict HTTP/1.1\nContent-Type: application/json\n\n{"mint":"Bo9jh3wsmcC2AjakLWzNmKJ3SgtZmXEcSaW7L2FAvUsU"}\n\nHTTP/1.1 402 Payment Required\nPAYMENT-REQUIRED: base64({ "x402Version": 2, "accepts": [{ "scheme": "exact", "network": "ccd:testnet",\n  "amount": "${a?.price?.microCcd ?? "1000000"}", "asset": "CCD", "payTo": "${payTo.slice(0, 12)}…", "extra": { "feePayer": "<sponsor>" } }] })\n\nPOST /x402/verdict + PAYMENT-SIGNATURE: base64({ signedTransaction, sender })\n\nHTTP/1.1 200 OK\nPAYMENT-RESPONSE: base64({ "success": true, "transaction": "<concordium tx>" })\n{ "verdict": "RUGGED", "riskScore": 88, "confidence": 0.7, ... }`;
+  const X402 = `POST /x402/verdict  {"mint":"<mint>"}\n→ 402 · PAYMENT-REQUIRED: base64({ "x402Version": 2, "accepts": [{ "scheme": "exact", "network": "ccd:testnet",\n     "amount": "${a?.price?.microCcd ?? "1000000"}", "asset": "CCD", "payTo": "${payTo.slice(0, 12)}…", "extra": { "feePayer": "<sponsor>" } }] })\nPOST /x402/verdict + PAYMENT-SIGNATURE: base64({ signedTransaction, sender })\n→ 200 · PAYMENT-RESPONSE: base64({ success, transaction }) · verdict JSON`;
   return (
-    <div className="max-w-[96ch]">
-      <div className="pt-3 text-fg-4 flex justify-between"><span>SENTINEL(1)</span><span>Agent Commands Manual</span><span>SENTINEL(1)</span></div>
+    <div className="mx-auto max-w-7xl px-4 py-12 grid gap-10 lg:grid-cols-[200px_1fr]">
+      <nav className="hidden lg:block sticky top-24 self-start space-y-2 mono text-sm">
+        {SECTIONS.map(s => <a key={s} href={`#${s.slice(3).toLowerCase()}`} className="block text-fg-3 hover:text-fg border-l-2 border-transparent hover:border-red pl-3 transition-colors">{s}</a>)}
+      </nav>
+      <div className="min-w-0 space-y-14">
+        <header><div className="display text-red text-sm">DOCS</div><h1 className="display text-[clamp(40px,7vw,96px)]">CALL SENTINEL</h1><p className="mt-3 text-fg-2 max-w-2xl">Three doors, one swarm. Any MCP client, any A2A agent, any script with an x402-aware fetch. Verdicts cost {price}; discovery, badge checks, audit and track lookups are free.</p></header>
 
-      <Man id="name" title="name">
-        <p>sentinel — accountable anti-rug verdicts for agents. MCP, A2A and x402 doors; one swarm behind them.</p>
-      </Man>
+        <Doc id="mcp" title="01 · MCP">
+          <p>Streamable HTTP, stateless. Add the server to Claude Desktop, Claude Code or any MCP client; discovery is free, verdicts are paid when a paywall is configured.</p>
+          <Code title="mcp config" text={MCP_CONFIG} />
+          <Code title="agent prompt" text={PROMPT} />
+        </Doc>
 
-      <Man id="synopsis" title="synopsis">
-        <pre className="whitespace-pre-wrap text-fg">{`sentinel_verdict  { mint, fresh? }        → verdict        (${price} over x402)\nsentinel_agents   { }                      → agents, badges (free)\nsentinel_check_badge { id }                → badge status   (free)\nsentinel_audit    { digest? | mint? }      → records        (free)\nsentinel_track    { limit? }               → track record   (free)`}</pre>
-      </Man>
+        <Doc id="tools" title="02 · Tools">
+          <div className="grid gap-2">{TOOLS.map(([n, i, d]) => <div key={n} className="rounded-2xl border border-line-2 p-4"><div className="flex flex-wrap items-baseline gap-3"><span className="mono text-fg">{n}</span><span className="mono text-xs text-fg-4">{i}</span></div><p className="mt-2 text-sm text-fg-2">{d}</p></div>)}</div>
+        </Doc>
 
-      <Man id="mcp" title="mcp" copy={MCP_CONFIG}>
-        <p>streamable HTTP, stateless. add the server to Claude Desktop, Claude Code or any MCP client; discovery is free, verdicts are paid when a paywall is configured.</p>
-        <Code>{MCP_CONFIG}</Code>
-        <p className="mt-2 text-fg-4">agent prompt <CopyButton text={PROMPT} /></p>
-        <Code>{PROMPT}</Code>
-      </Man>
+        <Doc id="a2a" title="03 · A2A">
+          <p>A2A v1.0 over JSON-RPC with SSE streaming. The Agent Card at <span className="mono">/.well-known/agent-card.json</span> is the one pinned in the Concordium Agent Registry and carries the badge extension.</p>
+          <Code title="SendStreamingMessage" text={A2A} />
+        </Doc>
 
-      <Man id="tools" title="tools">
-        {TOOLS.map(([n, i, d]) => <div key={n} className="grid grid-cols-[22ch_1fr] gap-x-2 mb-2"><span><span className="text-fg">{n}</span><div className="text-fg-4">{i}</div></span><span>{d}</span></div>)}
-      </Man>
+        <Doc id="x402" title="04 · x402">
+          <p>Pay per verdict in CCD on Concordium testnet: <span className="text-fg">{price}</span>, paid to <span className="mono text-fg break-all">{payTo}</span>. The 402 response carries the requirements; the client signs a sponsored transfer, our facilitator pays the fee and submits, finality in about ten seconds, verdict in the 200. The paying agent never needs CCD for fees, only for the price.</p>
+          <div className="grid gap-2 sm:grid-cols-3">
+            {[["MCP", "Claude, GPT, any MCP client", `tools/call sentinel_verdict · ${price}`], ["A2A", "agents speaking A2A v1.0", "SendMessage with a mint → Task with the verdict artifact"], ["HTTP", "bots and scripts", `POST /x402/verdict · ${price}`]].map(([n, who, how]) => <div key={n} className="rounded-2xl border border-line-2 p-4"><div className="display text-xl">{n}</div><div className="mt-1 text-sm text-fg-3">{who}</div><div className="mt-2 mono text-xs text-fg-2">{how}</div></div>)}
+          </div>
+          <Code title="plain HTTP" text={X402} />
+        </Doc>
 
-      <Man id="a2a" title="a2a" copy={A2A}>
-        <p>A2A v1.0 over JSON-RPC with SSE streaming. the Agent Card at <span className="text-fg">/.well-known/agent-card.json</span> is the one pinned in the Concordium Agent Registry and carries the badge extension.</p>
-        <Code>{A2A}</Code>
-      </Man>
+        <Doc id="audit" title="05 · Audit trail">
+          <p>Each verdict is canonicalised and hashed (sha256 over chain, mint, snapshot time, evidence, verdict). The digest, the subject, the band, the score and the agents' registry ids are appended to the <span className="mono">sentinel_audit</span> contract on Concordium testnet. The contract has no update and no delete; outcomes are added beside a record with <span className="mono">grade</span>, once per horizon. EU AI Act Art. 12 record keeping, readable by anyone on CCDScan.</p>
+          <Code title="contract entrypoints" text={AUDIT} />
+        </Doc>
 
-      <Man id="x402" title="x402" copy={X402}>
-        <p>pay per verdict in CCD on Concordium testnet: <span className="text-fg">{price}</span>, pay to <span className="text-fg">{payTo}</span>. the 402 carries the requirements; the client signs a sponsored transfer, our facilitator pays the fee and submits, finality in about ten seconds, verdict in the 200. the paying agent never needs CCD for fees, only for the price. discovery, badge checks and audit lookups are free.</p>
-        <div className="grid grid-cols-[6ch_1fr] gap-x-2 mt-2 mb-2"><span className="text-fg">MCP</span><span>Claude, GPT, any MCP client · tools/call sentinel_verdict · {price}</span><span className="text-fg">A2A</span><span>agents speaking A2A v1.0 · SendMessage with a mint → Task with the verdict artifact</span><span className="text-fg">HTTP</span><span>bots and scripts · POST /x402/verdict · {price}</span></div>
-        <Code>{X402}</Code>
-      </Man>
+        <Doc id="track" title="06 · Track record">
+          <p>Every sealed verdict is scored against what the token did at 1h, 24h and 7d. <span className="mono">riskScore/100</span> is read as the forecast P(rug); a rug is liquidity down more than 99%, no trades left, the labels of arXiv:2608.20271, or a pool under 1% of market cap. The report gives the Brier score, the skill against the base rate, the log score, a reliability diagram and the same per specialist, so a calling agent can weigh Sentinel the way Sentinel weighs its own agents. Live at <a className="text-fg underline" href="/track">/track</a>, over MCP as <span className="mono">sentinel_track</span>, and as JSON at <span className="mono">/track</span>.</p>
+        </Doc>
 
-      <Man id="audit" title="audit" copy={AUDIT}>
-        <p>each verdict is canonicalised and hashed (sha256 over chain, mint, snapshot time, evidence, verdict). the digest, the subject, the band, the score and the agents' registry ids are appended to the <span className="text-fg">sentinel_audit</span> contract on Concordium testnet. the contract has no update and no delete. EU AI Act Art. 12 record keeping, readable by anyone on CCDScan.</p>
-        <Code>{AUDIT}</Code>
-      </Man>
-
-      <Man id="verify" title="verify">
-        <p>two independent proofs. on-chain: the stored verdict JSON must hash to the digest in the Concordium record. offline: the ML-DSA-65 (FIPS 204) signature over <span className="text-fg">sha256(digest ‖ mint ‖ verdict ‖ score ‖ at)</span> with context <span className="text-fg">sentinel.verdict/1</span>, public key at <span className="text-fg">/.well-known/sentinel-keys.json</span>. post-quantum by design: the chains sign with Ed25519, the proof that a verdict came from Sentinel does not depend on it. every audit record has a <span className="text-fg">[verify]</span> action that runs this check in your browser.</p>
-      </Man>
-
-      <Man id="see-also" title="see also">
-        <p><a className="act" href="/audit">audit(1)</a> <a className="act" href="/agents">agents(1)</a> <a className="act" href="https://agent-registry-mcp.concordium.com/docs" target="_blank" rel="noreferrer">concordium-agent-registry(7)</a> <a className="act" href="https://testnet.ccdscan.io" target="_blank" rel="noreferrer">ccdscan(7)</a></p>
-      </Man>
+        <Doc id="verify" title="07 · Verify a verdict">
+          <p>Two independent proofs. On-chain: the stored verdict JSON must hash to the digest in the Concordium record. Offline: the ML-DSA-65 (FIPS 204) signature over <span className="mono">sha256(digest ‖ mint ‖ verdict ‖ score ‖ at)</span> with context <span className="mono">sentinel.verdict/1</span>, public key at <span className="mono">/.well-known/sentinel-keys.json</span>. Post-quantum by design: the chains sign with Ed25519, the proof that a verdict came from Sentinel does not depend on it. Every audit record has a button that runs this check in your browser.{a?.attestation ? ` Current key: ${a.attestation.alg}, ${a.attestation.publicKey.slice(0, 16)}…` : ""}</p>
+        </Doc>
+      </div>
     </div>
   );
 }
 
-function Man({ id, title, copy, children }: { id: string; title: string; copy?: string; children: React.ReactNode }) {
-  return <section id={id} className="scroll-mt-24"><Label>{title}{copy ? <> <CopyButton text={copy} /></> : null}</Label><div className="pl-0 sm:pl-[4ch] text-fg-2 space-y-1">{children}</div></section>;
+function Doc({ id, title, children }: { id: string; title: string; children: React.ReactNode }) {
+  return <section id={id} className="space-y-4 text-fg-2 leading-7 scroll-mt-24"><h2 className="display text-2xl text-fg">{title}</h2>{children}</section>;
 }
-function Code({ children }: { children: string }) {
-  return <pre className="whitespace-pre-wrap text-fg-3 border-l border-line-2 pl-3 my-1">{children}</pre>;
+function Code({ title, text }: { title: string; text: string }) {
+  return <div className="rounded-2xl border border-line-2 bg-bg-1 overflow-hidden"><div className="flex items-center justify-between px-4 h-10 border-b border-line mono text-xs text-fg-3"><span>{title}</span><CopyButton text={text} /></div><pre className="p-4 mono text-[12px] leading-5 overflow-x-auto text-fg-2 whitespace-pre-wrap">{text}</pre></div>;
 }
