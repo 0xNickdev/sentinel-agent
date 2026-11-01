@@ -1,0 +1,74 @@
+{
+  "gateway": {
+    "tokenId": 981,
+    "tokenAddress": "JyP9XuYWbM5LAuY1BXBRN",
+    "agentUri": "https://api.sentinelagent.pro/.well-known/agent-card.json",
+    "metadataHash": "4b4ed8c3a446310f7d8268cd83e2f38e087c3e496652d4d6691059c1a1155728",
+    "registerTx": "81fc718c3bc2aa651366c23d176cc01921b48f9e1bc7a499d2e16cbb743df0fc",
+    "setUriTx": "67081b11cd5ac3e77cf181c20bb179f8e30d1eaaaff0a02a509fd38752fcfcbc"
+  },
+  "judge": {
+    "tokenId": 982,
+    "tokenAddress": "JyP9XvdzXNaG12mhEPWxc",
+    "agentUri": "https://api.sentinelagent.pro/agents/judge/agent-card.json",
+    "metadataHash": "f1add9bce9cc1aac57c6a06df9b84170ccb7cfb02a2eeb879b891270822bcf9e",
+    "registerTx": "0ca49742e836fb2369a2df0e69773ef8c48933c95785a4c0a6f01c3cc64df28b",
+    "setUriTx": "f4c0f2dc17cc2e54cdd6c47dcb20e2c9d5c082e84b836cdcddfd02e01eaac92e"
+  },
+  "holders": {
+    "tokenId": 983,
+    "tokenAddress": "JyP9XwjUTQ5BqA1U88GxH",
+    "agentUri": "https://api.sentinelagent.pro/agents/holders/agent-card.json",
+    "metadataHash": "8244ae3fdcd5cbf80deea55f411d76fb4bdeec5167f74e5935657a56564c14da",
+    "registerTx": "0288c105b25dcab3ee99050ba17a0004c806e3cac576a83d81c60e7d9cc43d7b",
+    "setUriTx": "3a48834a7e1da1a291929d3eabf8a07c435d66bebf0bb8d01dde816cd6be26fd"
+  },
+  "snipers": {
+    "tokenId": 984,
+    "tokenAddress": "JyP9XxpxPRa7fHFHdSi8f",
+    "agentUri": "https://api.sentinelagent.pro/agents/snipers/agent-card.json",
+    "metadataHash": "db93c76df21cecff7454dc9a529ca36d0ab0794b8bf39894ab93ca5f3dbfb6bf",
+    "registerTx": "7e9a831c1ab6f181f4376079a997165ac35233c3e20b6277d81310e9786b2b56",
+    "setUriTx": "1b9ec8b511f60c76ac782abbdf6b61f1812616faf78782673e50ed6559455066"
+  },
+  "funding": {
+    "tokenId": 985,
+    "tokenAddress": "JyP9XyvSKT53VQV4eCrRY",
+    "agentUri": "https://api.sentinelagent.pro/agents/funding/agent-card.json",
+    "metadataHash": "e3687f4bec0ed50e509a7e998c197fae8d1d66fd4f84749fbab3acb77b187e0a",
+    "registerTx": "3c97f1ba76c82f6fa5241c00dc523280b131435808192d06b8c77b652e437b8d",
+    "setUriTx": "6050a2d88379b18392ecc45f0ccc30a54f56920d89ec9d9e205beecd5c2778bc"
+  },
+  "creator": {
+    "tokenId": 986,
+    "tokenAddress": "JyP9Y11vFUZyKXirwTVGZ",
+    "agentUri": "https://api.sentinelagent.pro/agents/creator/agent-card.json",
+    "metadataHash": "e9f913867494fec65d169eb84cad7f52911786b77270097f6cef800a26c9b4cb",
+    "registerTx": "090e21bfb622e0793e689d2839f687b94f3eb3629a910c768ead122cdea17055",
+    "setUriTx": "ee869ff11e28556b1cf20e03f8d9fe0154058288d3cbf3b7db5fccdf399e06d0"
+  },
+  "contract": {
+    "tokenId": 987,
+    "tokenAddress": "JyP9Y27QBW4u9exdA4hkR",
+    "agentUri": "https://api.sentinelagent.pro/agents/contract/agent-card.json",
+    "metadataHash": "7dcedf200cc9365d9cdbb3fc8b00ded144cd76cfd65f8a0de5b7304256834a76",
+    "registerTx": "27916d5678b65aa707c2df9161b77d19676767035988b78473f74703c307a2e1",
+    "setUriTx": "1e6c99d46d0399e7ccfba2ff1d3543fd6ed154d27ab1cb088f4dc0aff501c05c"
+  },
+  "market": {
+    "tokenId": 988,
+    "tokenAddress": "JyP9Y3Ct7XZpynCTKGUka",
+    "agentUri": "https://api.sentinelagent.pro/agents/market/agent-card.json",
+    "metadataHash": "f9591c81df272b0b68bebadb5017321b9f91e98ee8978b96aa94bbbf6dba42b1",
+    "registerTx": "5959336483fdf6415cfc1e39e03310c0c916693ad9759b295b933f49df37fa58",
+    "setUriTx": "7fad77411fb81c4269d669fe5bb67455532aeaeb29264ec4c464b35e22ed403e"
+  },
+  "flows": {
+    "tokenId": 989,
+    "tokenAddress": "JyP9Y4JN3Z4kouSAhLdSi",
+    "agentUri": "https://api.sentinelagent.pro/agents/flows/agent-card.json",
+    "metadataHash": "a503281901ebd06c90998cb580d3ac6e1d4dc5afebb6ddd1cfaba5e86308c9b2",
+    "registerTx": "4a9d9ab0d601ae2c4bc394d9f6a1482a319a9cb21d3f179e5c969f9765cbaf76",
+    "setUriTx": "f48defb2305066eb4bc49fb2bb0ba7e9f5a58ee1219a7adb8e2bb6f09ce48407"
+  }
+}

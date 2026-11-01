@@ -1,0 +1,73 @@
+{
+  "name": "Sentinel Judge",
+  "description": "Weighs the seven specialist findings under the consensus rule (veto, confidence-weighted mean, debate) and writes the verdict and the audit record.",
+  "url": "https://api.sentinelagent.pro/agents/judge/agent-card.json",
+  "version": "1.0.0",
+  "defaultInputModes": [
+    "text/markdown",
+    "application/json"
+  ],
+  "defaultOutputModes": [
+    "text/markdown",
+    "application/json"
+  ],
+  "authentication": {
+    "schemes": []
+  },
+  "skills": [
+    {
+      "id": "sentinel.judge",
+      "name": "Judge",
+      "description": "Weighs the seven specialist findings under the consensus rule (veto, confidence-weighted mean, debate) and writes the verdict and the audit record.",
+      "tags": [
+        "solana",
+        "rug-detection",
+        "consensus",
+        "judge"
+      ]
+    }
+  ],
+  "capabilities": {
+    "streaming": false,
+    "pushNotifications": false,
+    "extensions": [
+      {
+        "uri": "https://docs.concordium.com/a2a-extensions/concordium-badge/v1",
+        "description": "Verified by Concordium badge — on-chain agent identity in a CIS-8004 registry",
+        "required": false,
+        "params": {
+          "tokenAddress": "ccd:4221332d34e1694168c2a0c0b3fd0f27/cis-2:JyP9XvdzXNaG12mhEPWxc",
+          "owner": {
+            "account": "ccd:4221332d34e1694168c2a0c0b3fd0f27:4XB5Fr1jgcp9SuqTQQwyfiY7L6CncUQuvG1dY83ASpN9S4ZDhh"
+          },
+          "agentWallet": "ccd:4221332d34e1694168c2a0c0b3fd0f27:4XB5Fr1jgcp9SuqTQQwyfiY7L6CncUQuvG1dY83ASpN9S4ZDhh",
+          "contracts": {
+            "cis8004": "ccd:4221332d34e1694168c2a0c0b3fd0f27:12802.0",
+            "cis8": "ccd:4221332d34e1694168c2a0c0b3fd0f27:12801.0"
+          },
+          "services": {
+            "a2a": "https://api.sentinelagent.pro/a2a/judge"
+          },
+          "verify": "Resolve tokenAddress via CIS-8004 agent_of; confirm owner + status=Active + card SHA-256 == metadata_hash.",
+          "verification": {
+            "service": "Concordium Agent Registry",
+            "verifyUrl": "https://agent-registry-mcp.concordium.com/v1/badge-check/JyP9XvdzXNaG12mhEPWxc",
+            "mcp": "https://agent-registry-mcp.concordium.com/mcp",
+            "docs": "https://docs.concordium.com/en/mainnet/technical-reference/agent-registry/concordium-badge.html"
+          }
+        }
+      }
+    ]
+  },
+  "provider": {
+    "organization": "Sentinel",
+    "url": "https://api.sentinelagent.pro"
+  },
+  "documentationUrl": "https://api.sentinelagent.pro/docs",
+  "registrations": [
+    {
+      "agentId": 982,
+      "agentRegistry": "ccd:4221332d34e1694168c2a0c0b3fd0f27:12802.0"
+    }
+  ]
+}
