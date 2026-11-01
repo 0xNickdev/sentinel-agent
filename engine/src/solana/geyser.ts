@@ -4,14 +4,18 @@
 // decoder is pure so it can be unit-tested with a hand-built instruction.
 import { createHash } from 'node:crypto';
 import { EventEmitter } from 'node:events';
-import * as yellowstone from '@triton-one/yellowstone-grpc';
+import type * as yellowstone from '@triton-one/yellowstone-grpc';
 
+// The gRPC client is a native module (napi). It is loaded on first connect, not at import, so a host without the
+// platform binary loses only the launch feed, never the whole server.
 // The package ships CJS-shaped types without "type": "module", so TS sees the class at `default.default`
 // while Node loads the ESM build where it is `default`. Resolve whichever shape the runtime gives us.
 type ClientClass = typeof yellowstone.default.default;
-const resolved = yellowstone as unknown as { default: ClientClass | { default: ClientClass; CommitmentLevel: typeof yellowstone.CommitmentLevel }; CommitmentLevel?: typeof yellowstone.CommitmentLevel };
-const Client: ClientClass = typeof resolved.default === "function" ? resolved.default : resolved.default.default;
-const CommitmentLevel = resolved.CommitmentLevel ?? (resolved.default as { CommitmentLevel: typeof yellowstone.CommitmentLevel }).CommitmentLevel;
+let clientClass: Promise<ClientClass> | null = null;
+const loadClient = (): Promise<ClientClass> => (clientClass ??= import('@triton-one/yellowstone-grpc').then(m => {
+  const r = m as unknown as { default: ClientClass | { default: ClientClass } };
+  return typeof r.default === 'function' ? r.default : r.default.default;
+}));
 type SubscribeRequest = yellowstone.SubscribeRequest;
 type SubscribeUpdate = yellowstone.SubscribeUpdate;
 
@@ -115,7 +119,8 @@ export function launchesFromUpdate(u: SubscribeUpdate, now = Math.floor(Date.now
   return out;
 }
 
-const COMMITMENT = { processed: CommitmentLevel.PROCESSED, confirmed: CommitmentLevel.CONFIRMED, finalized: CommitmentLevel.FINALIZED } as const;
+/** yellowstone CommitmentLevel values (PROCESSED 0, CONFIRMED 1, FINALIZED 2), inlined so importing this file needs no native module. */
+const COMMITMENT = { processed: 0, confirmed: 1, finalized: 2 } as const;
 
 export interface LaunchFeedEvents { launch: [LaunchEvent]; error: [Error]; connected: []; }
 
@@ -170,6 +175,7 @@ export class LaunchFeed extends EventEmitter<LaunchFeedEvents> {
       commitment: COMMITMENT[this.o.commitment ?? 'processed'],
     };
     try {
+      const Client = await loadClient();
       const client = new Client(this.o.url, this.o.token, undefined);
       await client.connect();
       const stream = await client.subscribe();
