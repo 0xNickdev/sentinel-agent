@@ -70,6 +70,7 @@ export function VerifyCreator() {
   const [list, setList] = useState<Proof[] | null>(null);
   const [enabled, setEnabled] = useState(true);
   const [qr, setQr] = useState<{ img: string; uri: string } | null>(null);
+  const [phase, setPhase] = useState<string | null>(null);
 
   useEffect(() => { getJSON<{ enabled: boolean; proofs: Proof[] }>("/id/proofs").then(r => { setList(r.proofs); setEnabled(r.enabled); }).catch(() => setList([])); }, [proof]);
 
@@ -135,17 +136,22 @@ export function VerifyCreator() {
       const session = await approval();
       topic = session.topic;
       setQr(null);
+      // Send the request to the app as soon as it is anchored: the app is waiting on the pairing screen.
+      setPhase("Anchoring the request on Concordium (about 10 s). Keep the ID App open.");
       const res = await fetch(`${API}/id/request`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ wallet, connectionId: topic }) });
       const r = await res.json() as RequestResponse & { error?: string };
       if (!res.ok) throw new Error(r.error ?? `HTTP ${res.status}`);
       setReq(r); setStep(2);
+      setPhase("Approve the age proof in the Concordium ID App.");
+      const vp = await client.request({ topic, chainId: CCD_TESTNET, request: { method: WC_METHOD, params: r.request as object } });
+      setPhase("Last step: sign the challenge in your Solana wallet.");
       const { signature } = await p.signMessage(new TextEncoder().encode(r.message), "utf8");
       const sg = hex(signature);
       setSig(sg); setStep(3);
-      const vp = await client.request({ topic, chainId: CCD_TESTNET, request: { method: WC_METHOD, params: r.request as object } });
+      setPhase("Verifying and anchoring the audit record…");
       await submit(presentationOf(vp), r, sg);
     } finally {
-      setQr(null);
+      setQr(null); setPhase(null);
       if (topic) client.disconnect({ topic, reason: { code: 6000, message: "done" } }).catch(() => undefined);
     }
   });
@@ -219,6 +225,7 @@ export function VerifyCreator() {
               </div>
             </div>
           )}
+          {phase && <div className="mt-4 rounded-xl border border-line-2 p-3 mono text-xs text-fg-2"><span className="text-red">●</span> {phase}</div>}
           {err && <div className="mt-4 rounded-xl border border-red p-3 mono text-xs text-red break-words">{err}</div>}
         </div>
 
