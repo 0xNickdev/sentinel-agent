@@ -114,7 +114,16 @@ export function VerifyCreator() {
     const c = await concordiumWallet();
     if (!c) throw new Error("No Concordium wallet found. Install the Concordium Wallet for Web, add a testnet identity, then reload.");
     await c.connect();
-    const vp = await c.requestVerifiablePresentationV1(req.request);
+    // A first-time connection can still be settling when the proof request lands; the wallet then answers
+    // "Connection rejected". Retry once after a moment.
+    let vp: Awaited<ReturnType<ConcordiumWallet["requestVerifiablePresentationV1"]>>;
+    try { vp = await c.requestVerifiablePresentationV1(req.request); }
+    catch (e) {
+      if (!/connection rejected/i.test(e instanceof Error ? e.message : String(e))) throw e;
+      await new Promise(r => setTimeout(r, 800));
+      await c.connect();
+      vp = await c.requestVerifiablePresentationV1(req.request);
+    }
     await submit(presentationOf(typeof vp?.toJSON === "function" ? vp.toJSON() : vp));
   });
 
@@ -211,7 +220,7 @@ export function VerifyCreator() {
               <span className="display text-red">VERIFIED HUMAN CREATOR</span>
             )}
             {step === 1 && <span className="mono text-xs text-fg-4">about 10 s: waits for Concordium finalization</span>}
-            {step >= 1 && <span className="mono text-xs text-fg-4 basis-full">ID App: scan once, then approve in Phantom and in the app; Sentinel anchors the request for that session.</span>}
+            {step >= 1 && step < 4 && <span className="mono text-xs text-fg-4 basis-full">ID App: scan once, then approve in Phantom and in the app; Sentinel anchors the request for that session.</span>}
             {!enabled && <span className="mono text-xs text-red">creator proofs are off on this server</span>}
           </div>
           {qr && (
