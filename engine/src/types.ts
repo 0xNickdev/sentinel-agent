@@ -91,6 +91,24 @@ export interface CreatorHistory {
   verifiedHuman?: boolean;
 }
 
+/**
+ * A creator wallet bound to a verified human: the wallet signed a Sentinel challenge and the same session
+ * presented a Concordium ID zero-knowledge proof (age 18+ from a trusted identity provider). Nothing personal
+ * is kept: only the wallet, when, and the two on-chain anchors (request and audit) anyone can check on CCDScan.
+ */
+export interface CreatorProof {
+  /** the Solana wallet that signed the challenge */
+  wallet: string;
+  /** what the ZK proof established, e.g. ["age>=18"] */
+  claims: string[];
+  /** unix seconds */
+  verifiedAt: number;
+  /** Concordium tx anchoring the verification request (CCDVRA) */
+  requestTx: string;
+  /** Concordium tx anchoring the verification audit record (CCDVAA) */
+  auditTx: string;
+}
+
 /** What a SOL transfer landed on: a named exchange, the creator's funder, the creator, a hub several traced wallets paid into, or a wallet with no record. */
 export type FlowKind = 'exchange' | 'funder' | 'dev' | 'hub' | 'wallet';
 
@@ -144,6 +162,8 @@ export interface TokenSnapshot {
   market?: MarketData | null;
   /** SOL trails out of the creator and selling insiders after their last sell; null when no Helius key or the trace was skipped */
   flows?: FlowTrail[] | null;
+  /** a Concordium ID proof bound to the creator wallet; attached at verdict time, never fetched from Solana */
+  creatorProof?: CreatorProof | null;
   /** snapshot time, unix seconds */
   at: number;
 }
@@ -172,7 +192,7 @@ export interface Evidence {
   snipers: { wallets: string[]; boughtPct: number; holdingPct: number; windowSlots: number };
   bundles: { groups: number; wallets: number; boughtPct: number; largestGroup: number; /** % of supply the bundle wallets still hold */ heldPct: number };
   linked: { clusters: Array<{ funder: string; wallets: string[]; pct: number; viaCreator: boolean }>; linkedPct: number; linkedToCreatorPct: number; checked: number; /** traced wallets whose first funder is a named exchange or launcher, with the name */ exchangeFunded: Array<{ wallet: string; exchange: string }> };
-  creator: { address: string | null; status: 'holding' | 'sold_some' | 'sold_all' | 'never_bought' | 'unknown'; holdingPct: number; /** % of supply the creator moved into a locker they signed for; counted as held, not sold */ lockedPct: number; boughtTokens: number; soldTokens: number; history: CreatorHistory | null };
+  creator: { address: string | null; status: 'holding' | 'sold_some' | 'sold_all' | 'never_bought' | 'unknown'; holdingPct: number; /** % of supply the creator moved into a locker they signed for; counted as held, not sold */ lockedPct: number; boughtTokens: number; soldTokens: number; history: CreatorHistory | null; /** set only when a Concordium ID proof is bound to the creator wallet */ proof?: CreatorProof };
   contract: { mintRevoked: boolean; freezeRevoked: boolean; transferFeeBps: number; permanentDelegate: boolean; transferHook: boolean; metadataMutable: boolean | null };
   liquidity: Liquidity;
   market: MarketData | null;

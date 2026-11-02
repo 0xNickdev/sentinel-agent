@@ -13,6 +13,7 @@ import { LaunchSampler } from './sampler.js';
 import { accountFromEnv, nodeClient } from './chain.js';
 import type { Network } from './registry.js';
 import { VerdictService } from './service.js';
+import { CreatorProofs } from './idproof.js';
 import { facilitatorApp, type PaywallOptions } from './x402.js';
 
 export interface Bootstrap {
@@ -30,6 +31,8 @@ export interface Bootstrap {
   resolver: Resolver | null;
   /** judges random live launches on a clock to feed the track; null unless SENTINEL_SAMPLER_EVERY_MIN is set */
   sampler: LaunchSampler | null;
+  /** Concordium ID proofs bound to creator wallets; null without a verifier account (the sponsor pays the anchors) */
+  creatorProofs: CreatorProofs | null;
   log: (m: string) => void;
 }
 
@@ -71,7 +74,14 @@ export function bootstrapFromEnv(root: string, log: (m: string) => void = m => c
     try { launchFeed = new LaunchFeed({ url: process.env.SHYFT_GRPC_URL, token: process.env.SHYFT_GRPC_TOKEN, log }); } catch (e) { log(`launch · feed disabled: ${e instanceof Error ? e.message : String(e)}`); }
   } else log('launch · off (set SHYFT_GRPC_URL and SHYFT_GRPC_TOKEN for the live launch feed)');
 
-  const service = new VerdictService({ rpcUrl: process.env.SOLANA_RPC_URL ?? 'https://api.mainnet-beta.solana.com', fallbackRpcUrl: process.env.SOLANA_RPC_URL_FALLBACK || process.env.SOLANA_RPC_URL_SHYFT || null, audit, dataDir, launchFeed, log });
+  // Verified creators: the sponsor pays the two RegisterData anchors, so the creator never needs CCD.
+  const verifier = accountFromEnv('CONCORDIUM_VERIFIER') ?? sponsor;
+  const creatorProofs = verifier && process.env.SENTINEL_IDPROOF !== '0'
+    ? new CreatorProofs({ grpc: nodeClient(network, process.env.CONCORDIUM_NODE), network, verifier, resourceId: process.env.SENTINEL_SITE_URL ?? 'https://sentinelagent.pro', dataDir, log })
+    : null;
+  log(creatorProofs ? `idproof · on · verifier ${verifier!.address.toString()}` : 'idproof · off (needs CONCORDIUM_SPONSOR_* or CONCORDIUM_VERIFIER_*)');
+
+  const service = new VerdictService({ rpcUrl: process.env.SOLANA_RPC_URL ?? 'https://api.mainnet-beta.solana.com', fallbackRpcUrl: process.env.SOLANA_RPC_URL_FALLBACK || process.env.SOLANA_RPC_URL_SHYFT || null, audit, dataDir, launchFeed, creatorProofs, log });
 
   // Demo snapshots: pre-warmed TokenSnapshot JSON files so the demo never waits on RPC.
   const seedDir = process.env.SENTINEL_SEED_SNAPSHOTS;
@@ -94,5 +104,5 @@ export function bootstrapFromEnv(root: string, log: (m: string) => void = m => c
     : null;
   log(sampler ? `sample · on: one launch every ${everyMin} min, at most ${process.env.SENTINEL_SAMPLER_PER_DAY ?? 48}/day` : 'sample · off (set SENTINEL_SAMPLER_EVERY_MIN to judge live launches for the track)');
   const corsOrigins = (process.env.SENTINEL_CORS_ORIGINS ?? 'http://localhost:3000,http://localhost:3100').split(',').map(s => s.trim()).filter(Boolean);
-  return { network, baseUrl, cardsDir, dataDir, service, paywall, facilitatorUrl, audit: Boolean(audit), corsOrigins, resolver, sampler, log };
+  return { network, baseUrl, cardsDir, dataDir, service, paywall, facilitatorUrl, audit: Boolean(audit), corsOrigins, resolver, sampler, creatorProofs, log };
 }

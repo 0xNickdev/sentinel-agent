@@ -163,7 +163,8 @@ export function creatorStats(snapshot: TokenSnapshot) {
   const sold = Math.max(0, trades.filter(t => t.account === creator && t.side === 'sell').reduce((s, t) => s + t.amount, 0) - locked);
   const balance = holders.filter(h => h.owner === creator).reduce((s, h) => s + h.amount, 0) + locked;
   const status: 'never_bought' | 'sold_all' | 'sold_some' | 'holding' = bought === 0 && balance === 0 ? 'never_bought' : bought > 0 && balance === 0 ? 'sold_all' : sold > 0 ? 'sold_some' : 'holding';
-  return { address: creator, status, holdingPct: round(pct(balance, supply)), lockedPct: round(pct(locked, supply)), boughtTokens: bought, soldTokens: sold, history: snapshot.creatorHistory };
+  const proof = snapshot.creatorProof && snapshot.creatorProof.wallet === creator ? snapshot.creatorProof : null;
+  return { address: creator, status, holdingPct: round(pct(balance, supply)), lockedPct: round(pct(locked, supply)), boughtTokens: bought, soldTokens: sold, history: snapshot.creatorHistory, ...(proof ? { proof } : {}) };
 }
 
 // ── Contract-level facts
@@ -223,7 +224,8 @@ export function deriveFlags(e: Omit<Evidence, 'flags' | 'baselineScore'> & { at:
   const h = e.creator.history;
   if (h && h.rugged > 0) add('serial_rugger', h.rugged >= 2 ? 'critical' : 'warn', `${h.rugged} of the creator's ${h.launched} previous tokens rugged.`, { rugged: h.rugged, launched: h.launched });
   if (h && h.socialReusedBy > 0) add('social_reused', 'warn', `The same social handle was used by ${h.socialReusedBy} other tokens.`, { socialReusedBy: h.socialReusedBy });
-  if (h?.verifiedHuman) add('verified_creator', 'info', 'A verified human (Concordium ID) stands behind this creator.', { verifiedHuman: true });
+  if (e.creator.proof) add('verified_creator', 'info', `A verified human (Concordium ID, ${e.creator.proof.claims.join(', ')}) signed for this creator wallet; no personal data was shared.`, { verifiedHuman: true, auditTx: e.creator.proof.auditTx, requestTx: e.creator.proof.requestTx, verifiedAt: e.creator.proof.verifiedAt });
+  else if (h?.verifiedHuman) add('verified_creator', 'info', 'A verified human (Concordium ID) stands behind this creator.', { verifiedHuman: true });
   const m = e.market;
   if (m) {
     const ratio = m.fdvUsd && m.liquidityUsd > 0 ? m.fdvUsd / m.liquidityUsd : null;

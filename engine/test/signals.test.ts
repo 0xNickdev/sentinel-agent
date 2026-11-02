@@ -143,3 +143,25 @@ describe('lockers, burns, bundles that hold, dev gone', () => {
     expect(analyze(s).flags.map(f => f.code)).not.toContain('dev_gone');
   });
 });
+
+describe('analyze — Concordium ID creator proof', () => {
+  const proof = { wallet: 'creator', claims: ['age>=18'], verifiedAt: 1_700_000_100, requestTx: 'aa'.repeat(32), auditTx: 'bb'.repeat(32) };
+  it('raises verified_creator with the anchors as evidence when the proof names the creator wallet', () => {
+    const s = clean();
+    s.creatorHistory = null;
+    s.creatorProof = proof;
+    const e = analyze(s);
+    expect(e.creator.proof).toEqual(proof);
+    const f = e.flags.find(x => x.code === 'verified_creator');
+    expect(f?.severity).toBe('info');
+    expect(f?.evidence.auditTx).toBe(proof.auditTx);
+  });
+  it('ignores a proof bound to another wallet', () => {
+    const s = clean();
+    s.creatorHistory = null;
+    s.creatorProof = { ...proof, wallet: 'someoneElse' };
+    const e = analyze(s);
+    expect(e.creator.proof).toBeUndefined();
+    expect(e.flags.some(x => x.code === 'verified_creator')).toBe(false);
+  });
+});

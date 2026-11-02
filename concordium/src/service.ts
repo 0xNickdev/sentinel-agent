@@ -4,7 +4,7 @@
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { AnthropicLLM, judgeToken, keysFromEnv, signVerdict, type AttestationKeys, type LLM, type SwarmEvent, type Verdict } from '@sentinel/agents';
-import { SolanaAdapter, type LaunchEvent, type LaunchFeed, type Outcome, type TokenSnapshot } from '@sentinel/engine';
+import { SolanaAdapter, type CreatorProof, type LaunchEvent, type LaunchFeed, type Outcome, type TokenSnapshot } from '@sentinel/engine';
 import type { AuditClient } from './audit.js';
 import type { Account } from './chain.js';
 import { explorerTx } from './chain.js';
@@ -22,6 +22,8 @@ export interface VerdictServiceOptions {
   keys?: AttestationKeys;
   /** real-time pump.fun launch feed (Geyser); omitted when no gRPC credentials */
   launchFeed?: LaunchFeed | null;
+  /** creator wallets bound to a Concordium ID proof; attached to the snapshot at verdict time */
+  creatorProofs?: { get(wallet: string | null | undefined): CreatorProof | null } | null;
   log?: (m: string) => void;
 }
 
@@ -110,7 +112,10 @@ export class VerdictService {
   async verdict(mint: string, onEvent?: (ev: SwarmEvent) => void, opts: { snapshot?: TokenSnapshot; fresh?: boolean } = {}): Promise<StoredVerdict> {
     if (!isMint(mint)) throw new Error(`not a Solana mint: ${mint}`);
     if (!opts.fresh) { const prev = this.byMint.get(mint); if (prev && Date.now() / 1000 - prev.stored.at < 300) { onEvent?.({ type: 'verdict', verdict: prev }); return prev; } }
-    const snapshot = opts.snapshot ?? (await this.snapshot(mint));
+    const base = opts.snapshot ?? (await this.snapshot(mint));
+    // A proof can arrive after the snapshot was cached, so it is looked up per verdict, never cached with the chain data.
+    const proof = this.o.creatorProofs?.get(base.creator) ?? null;
+    const snapshot = proof ? { ...base, creatorProof: { wallet: proof.wallet, claims: proof.claims, verifiedAt: proof.verifiedAt, requestTx: proof.requestTx, auditTx: proof.auditTx } } : base;
     const v = await judgeToken(snapshot, { llm: this.llm, ...(this.o.audit ? { registry: Object.fromEntries(this.o.audit.agentIds.map((id, i) => [['holders', 'snipers', 'funding', 'creator', 'contract', 'market', 'judge'][i] ?? `agent${i}`, String(id)])) } : {}) }, onEvent);
     let auditSeq: number | null = null, auditExplorer: string | null = null;
     if (this.o.audit) {

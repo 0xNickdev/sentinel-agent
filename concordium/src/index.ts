@@ -8,3 +8,4 @@ export * from './service.js';
 export * from './bootstrap.js';
 export * from './track.js';
 export * from './sampler.js';
+export * from './idproof.js';

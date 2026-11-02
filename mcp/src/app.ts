@@ -7,7 +7,7 @@ import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { cors } from 'hono/cors';
 import { secureHeaders } from 'hono/secure-headers';
-import { gatewayApp, paywall, type PaywallOptions, type VerdictService, type Network } from '@sentinel/concordium';
+import { gatewayApp, paywall, type CreatorProofs, type PaywallOptions, type VerdictService, type Network } from '@sentinel/concordium';
 import { rateLimit } from './hardening.js';
 import { badgeExtension, mountA2A } from './a2a.js';
 import { agentDirectory, mountMcp, type McpOptions } from './mcp-server.js';
@@ -23,6 +23,8 @@ export interface SentinelAppOptions {
   /** requests per minute per client IP on unpaid routes (default 60; 0 disables) */
   rateLimitPerMinute?: number;
   publicStream?: boolean;
+  /** Concordium ID proofs for creator wallets; the /id routes answer 503 without it */
+  creatorProofs?: CreatorProofs | null;
   log?: (m: string) => void;
 }
 
@@ -50,6 +52,30 @@ export function sentinelApp(o: SentinelAppOptions): Hono {
   }
   // REST twin of the sentinel_agents tool for the showcase site.
   app.get('/api/agents', c => c.json({ network: o.network, agents: agentDirectory(mcpOpts), price: o.paywall ? { microCcd: o.paywall.priceMicroCcd, payTo: o.paywall.payTo } : null, attestation: { alg: 'ML-DSA-65', publicKey: o.service.keys.publicKeyHex } }));
+  // Verified creators (Concordium Verify and Access, in-process). Free: the sponsor pays both anchors.
+  const ids = o.creatorProofs ?? null;
+  const SOL = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+  app.get('/id/creator/:wallet', c => {
+    const w = c.req.param('wallet');
+    if (!SOL.test(w)) return c.json({ error: 'not a Solana address' }, 400);
+    const r = ids?.get(w) ?? null;
+    return c.json({ wallet: w, verified: Boolean(r), proof: r });
+  });
+  app.get('/id/proofs', c => c.json({ enabled: Boolean(ids), proofs: (ids?.all() ?? []).slice(0, 50) }));
+  app.post('/id/request', async c => {
+    if (!ids) return c.json({ error: 'creator proofs are not enabled on this server' }, 503);
+    const body = await c.req.json().catch(() => null) as { wallet?: string } | null;
+    if (!body?.wallet || !SOL.test(body.wallet)) return c.json({ error: 'body must be {"wallet": "<Solana address>"}' }, 400);
+    try { return c.json(await ids.request(body.wallet)); }
+    catch (e) { o.log?.(`idproof · request failed: ${e instanceof Error ? e.message : String(e)}`); return c.json({ error: e instanceof Error ? e.message : 'request failed' }, 502); }
+  });
+  app.post('/id/verify', async c => {
+    if (!ids) return c.json({ error: 'creator proofs are not enabled on this server' }, 503);
+    const body = await c.req.json().catch(() => null) as { requestTx?: string; presentation?: unknown; solanaSignature?: string } | null;
+    if (!body?.requestTx || !/^[0-9a-f]{64}$/i.test(body.requestTx) || !body.presentation || typeof body.solanaSignature !== 'string') return c.json({ error: 'body must be {requestTx, presentation, solanaSignature}' }, 400);
+    try { return c.json({ verified: true, proof: await ids.verify({ requestTx: body.requestTx, presentation: body.presentation, solanaSignature: body.solanaSignature }) }); }
+    catch (e) { const m = e instanceof Error ? e.message : String(e); o.log?.(`idproof · verify failed: ${m}`); return c.json({ verified: false, error: m }, 422); }
+  });
   mountMcp(app, '/mcp', mcpOpts);
   // A2A JSON-RPC lives at /a2a (GET there returns the live A2A card). /.well-known/agent-card.json is the registered card,
   // served byte-exact by the gateway below: the registry pins its sha256, so nothing may generate it on the fly.
