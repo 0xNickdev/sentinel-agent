@@ -151,7 +151,9 @@ export class CreatorProofs {
   async request(wallet: string, connectionId?: string): Promise<{ request: VerificationRequestV1.JSON; requestTx: string; requestExplorer: string; message: string; expiresAt: number }> {
     if (!SOLANA_RE.test(wallet) || base58Decode(wallet).length !== 32) throw new Error('not a Solana wallet address');
     const issuers = (this.o.issuers ?? [0, 1, 2, 3]).map(i => new IdentityProviderDID(this.sdkNetwork, i));
-    const claims = VerificationRequestV1.claimsBuilder().addAccountOrIdentityClaims(issuers, b => b.addMinimumAge(18)).getClaims();
+    // The Concordium ID App proves from the identity credential only; browser wallets may use either.
+    const builder = VerificationRequestV1.claimsBuilder();
+    const claims = (connectionId ? builder.addIdentityClaims(issuers, b => b.addMinimumAge(18)) : builder.addAccountOrIdentityClaims(issuers, b => b.addMinimumAge(18))).getClaims();
     // The Concordium ID App matches a request to its WalletConnect session by ConnectionID = the session topic.
     if (connectionId !== undefined && !/^[0-9a-f]{64}$/i.test(connectionId)) throw new Error('connectionId must be a WalletConnect session topic');
     const context = VerificationRequestV1.createSimpleContext(new Uint8Array(randomBytes(32)), connectionId ?? randomUUID(), this.o.resourceId, `sentinel:creator:${wallet}`);
