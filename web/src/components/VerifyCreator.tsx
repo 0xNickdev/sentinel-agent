@@ -100,9 +100,9 @@ export function VerifyCreator() {
     setSig(hex(signature)); setStep(3);
   });
 
-  const submit = async (presentation: unknown) => {
-    if (!req || !sig) throw new Error("start again");
-    const res = await fetch(`${API}/id/verify`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ requestTx: req.requestTx, presentation, solanaSignature: sig }) });
+  const submit = async (presentation: unknown, r: RequestResponse | null = req, sg: string | null = sig) => {
+    if (!r || !sg) throw new Error("start again");
+    const res = await fetch(`${API}/id/verify`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ requestTx: r.requestTx, presentation, solanaSignature: sg }) });
     const j = await res.json() as { verified: boolean; proof?: Proof; error?: string };
     if (!res.ok || !j.verified || !j.proof) throw new Error(j.error ?? `HTTP ${res.status}`);
     setProof(j.proof); setStep(4);
@@ -117,23 +117,37 @@ export function VerifyCreator() {
     await submit(presentationOf(typeof vp?.toJSON === "function" ? vp.toJSON() : vp));
   });
 
+  // ID App: pair first, then anchor a request whose ConnectionID is the WalletConnect session topic (that is how the
+  // app finds the request), then sign that request with the Solana wallet, then ask the app for the proof.
   const proveWithIdApp = () => run(async () => {
-    if (!req || !sig) throw new Error("start again");
+    if (!wallet) throw new Error("connect the Solana wallet first");
     if (!WC_PROJECT) throw new Error("WalletConnect is not configured on this site (NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID).");
+    const p = (window as W).phantom?.solana ?? (window as W).solana;
+    if (!p) throw new Error("Solana wallet disconnected");
     const client = await signClient();
-    const { uri, approval } = await client.connect({ requiredNamespaces: { ccd: { methods: [WC_METHOD], chains: [CCD_TESTNET], events: [] } } });
+    const { uri, approval } = await client.connect({ optionalNamespaces: { ccd: { methods: [WC_METHOD], chains: [CCD_TESTNET], events: [] } } });
     if (!uri) throw new Error("WalletConnect returned no pairing URI");
     const QR = await import("qrcode");
-    // Wrap the pairing URI in the ID App's own scheme (as the official verification-web-ui does): a bare wc: link
-    // opens whatever wallet the phone registered for WalletConnect, e.g. MetaMask.
+    // The QR holds an https hand-off page (phone cameras ignore custom schemes); the tap link uses the app scheme directly.
     setQr({ uri: idAppLink(uri), img: await QR.toDataURL(qrLink(uri), { margin: 1, width: 280, color: { dark: "#000000", light: "#ffffff" } }) });
+    let topic: string | null = null;
     try {
       const session = await approval();
+      topic = session.topic;
       setQr(null);
-      const res = await client.request({ topic: session.topic, chainId: CCD_TESTNET, request: { method: WC_METHOD, params: { ...(req.request as object), metadata: { appName: "Sentinel", description: "Prove you are a verified human, 18+. Nothing personal is shared.", url: window.location.origin, icons: ["https://sentinelagent.pro/favicon.ico"] } } } });
-      await submit(presentationOf(res));
-      client.disconnect({ topic: session.topic, reason: { code: 6000, message: "done" } }).catch(() => undefined);
-    } finally { setQr(null); }
+      const res = await fetch(`${API}/id/request`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ wallet, connectionId: topic }) });
+      const r = await res.json() as RequestResponse & { error?: string };
+      if (!res.ok) throw new Error(r.error ?? `HTTP ${res.status}`);
+      setReq(r); setStep(2);
+      const { signature } = await p.signMessage(new TextEncoder().encode(r.message), "utf8");
+      const sg = hex(signature);
+      setSig(sg); setStep(3);
+      const vp = await client.request({ topic, chainId: CCD_TESTNET, request: { method: WC_METHOD, params: r.request as object } });
+      await submit(presentationOf(vp), r, sg);
+    } finally {
+      setQr(null);
+      if (topic) client.disconnect({ topic, reason: { code: 6000, message: "done" } }).catch(() => undefined);
+    }
   });
 
   const check = () => run(async () => {
@@ -184,14 +198,14 @@ export function VerifyCreator() {
           <div className="mt-6 pt-5 border-t border-line flex flex-wrap items-center gap-3">
             {action ? (
               <>
-                <button onClick={action.go} disabled={busy || !enabled} className="pill disabled:opacity-50">{busy ? "Working…" : step === 3 ? "Browser wallet" : action.label}</button>
-                {step === 3 && <button onClick={proveWithIdApp} disabled={busy || !enabled} className="pill pill-ghost disabled:opacity-50">Concordium ID App · QR</button>}
+                <button onClick={action.go} disabled={busy || !enabled} className="pill disabled:opacity-50">{busy ? "Working…" : step === 3 ? "Browser wallet" : step >= 1 ? `${action.label} · browser wallet` : action.label}</button>
+                {step >= 1 && <button onClick={proveWithIdApp} disabled={busy || !enabled} className="pill pill-ghost disabled:opacity-50">Concordium ID App · QR</button>}
               </>
             ) : (
               <span className="display text-red">VERIFIED HUMAN CREATOR</span>
             )}
             {step === 1 && <span className="mono text-xs text-fg-4">about 10 s: waits for Concordium finalization</span>}
-            {step === 3 && <span className="mono text-xs text-fg-4">Concordium Wallet for Web, or scan with the Concordium ID App</span>}
+            {step >= 1 && <span className="mono text-xs text-fg-4 basis-full">ID App: scan once, then approve in Phantom and in the app; Sentinel anchors the request for that session.</span>}
             {!enabled && <span className="mono text-xs text-red">creator proofs are off on this server</span>}
           </div>
           {qr && (

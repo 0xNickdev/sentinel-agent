@@ -64,9 +64,10 @@ export function sentinelApp(o: SentinelAppOptions): Hono {
   app.get('/id/proofs', c => c.json({ enabled: Boolean(ids), proofs: (ids?.all() ?? []).slice(0, 50) }));
   app.post('/id/request', async c => {
     if (!ids) return c.json({ error: 'creator proofs are not enabled on this server' }, 503);
-    const body = await c.req.json().catch(() => null) as { wallet?: string } | null;
-    if (!body?.wallet || !SOL.test(body.wallet)) return c.json({ error: 'body must be {"wallet": "<Solana address>"}' }, 400);
-    try { return c.json(await ids.request(body.wallet)); }
+    const body = await c.req.json().catch(() => null) as { wallet?: string; connectionId?: string } | null;
+    if (!body?.wallet || !SOL.test(body.wallet)) return c.json({ error: 'body must be {"wallet": "<Solana address>", "connectionId"?: "<WalletConnect topic>"}' }, 400);
+    if (body.connectionId !== undefined && !/^[0-9a-f]{64}$/i.test(body.connectionId)) return c.json({ error: 'connectionId must be a WalletConnect session topic (64 hex)' }, 400);
+    try { return c.json(await ids.request(body.wallet, body.connectionId)); }
     catch (e) { o.log?.(`idproof · request failed: ${e instanceof Error ? e.message : String(e)}`); return c.json({ error: e instanceof Error ? e.message : 'request failed' }, 502); }
   });
   app.post('/id/verify', async c => {

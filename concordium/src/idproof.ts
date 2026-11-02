@@ -148,11 +148,13 @@ export class CreatorProofs {
   }
 
   /** Step 1: build and anchor a verification request bound to `wallet`. */
-  async request(wallet: string): Promise<{ request: VerificationRequestV1.JSON; requestTx: string; requestExplorer: string; message: string; expiresAt: number }> {
+  async request(wallet: string, connectionId?: string): Promise<{ request: VerificationRequestV1.JSON; requestTx: string; requestExplorer: string; message: string; expiresAt: number }> {
     if (!SOLANA_RE.test(wallet) || base58Decode(wallet).length !== 32) throw new Error('not a Solana wallet address');
     const issuers = (this.o.issuers ?? [0, 1, 2, 3]).map(i => new IdentityProviderDID(this.sdkNetwork, i));
     const claims = VerificationRequestV1.claimsBuilder().addAccountOrIdentityClaims(issuers, b => b.addMinimumAge(18)).getClaims();
-    const context = VerificationRequestV1.createSimpleContext(new Uint8Array(randomBytes(32)), randomUUID(), this.o.resourceId, `sentinel:creator:${wallet}`);
+    // The Concordium ID App matches a request to its WalletConnect session by ConnectionID = the session topic.
+    if (connectionId !== undefined && !/^[0-9a-f]{64}$/i.test(connectionId)) throw new Error('connectionId must be a WalletConnect session topic');
+    const context = VerificationRequestV1.createSimpleContext(new Uint8Array(randomBytes(32)), connectionId ?? randomUUID(), this.o.resourceId, `sentinel:creator:${wallet}`);
     const request = await this.serial(async () => VerificationRequestV1.createAndAnchor(this.o.grpc, await this.anchorMeta(), context, claims, { app: 'sentinel', purpose: 'creator-proof' }));
     const requestTx = TransactionHash.toHexString(request.transactionRef);
     const expiresAt = Date.now() + (this.o.ttlMs ?? 15 * 60_000);
