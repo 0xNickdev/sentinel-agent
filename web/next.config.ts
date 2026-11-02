@@ -5,6 +5,8 @@ import type { NextConfig } from "next";
 const api = process.env.SENTINEL_API_URL ?? "http://localhost:4020";
 
 const nextConfig: NextConfig = {
+  // Phones on the LAN open /verify/open from the ID App QR during local testing (e.g. SENTINEL_DEV_ORIGINS=192.168.1.20).
+  allowedDevOrigins: (process.env.SENTINEL_DEV_ORIGINS ?? "").split(",").map(s => s.trim()).filter(Boolean),
   turbopack: {
     rules: {
       "*.css": {

@@ -8,6 +8,7 @@ const links = [
   { href: "/audit", label: "Audit" },
   { href: "/track", label: "Track" },
   { href: "/agents", label: "Agents" },
+  { href: "/verify", label: "Verify" },
   { href: "/docs", label: "Docs · MCP" },
 ];
 
