@@ -3,72 +3,117 @@
     "tokenId": 981,
     "tokenAddress": "JyP9XuYWbM5LAuY1BXBRN",
     "agentUri": "https://api.sentinelagent.pro/.well-known/agent-card.json",
-    "metadataHash": "4b4ed8c3a446310f7d8268cd83e2f38e087c3e496652d4d6691059c1a1155728",
+    "metadataHash": "e0bcd93654bc76ec70b19f82f2500f7bd2fc8916e4fb55215b504d90aeb17e5f",
     "registerTx": "81fc718c3bc2aa651366c23d176cc01921b48f9e1bc7a499d2e16cbb743df0fc",
-    "setUriTx": "67081b11cd5ac3e77cf181c20bb179f8e30d1eaaaff0a02a509fd38752fcfcbc"
+    "setUriTx": "67081b11cd5ac3e77cf181c20bb179f8e30d1eaaaff0a02a509fd38752fcfcbc",
+    "refreshTx": "cee5bc071aa73b5eb4566e2b50c5e479ac6680561efa544b6facd0f2aab722e9",
+    "metadataTxs": {
+      "trackRecord": "42952147169ddafb96b810c3cd966b01900afd548f485cb9ec1cd79b572b2436",
+      "trackRecordUrl": "f78ba46e258bc4a4d3af365f9616f41f52a7a96be091e7de0955ac38d1fb95b7"
+    }
   },
   "judge": {
     "tokenId": 982,
     "tokenAddress": "JyP9XvdzXNaG12mhEPWxc",
     "agentUri": "https://api.sentinelagent.pro/agents/judge/agent-card.json",
-    "metadataHash": "f1add9bce9cc1aac57c6a06df9b84170ccb7cfb02a2eeb879b891270822bcf9e",
+    "metadataHash": "6c6137cc4930b3c9bd1de18d209f2b52cf2da81e56c0566d8e80491628c63053",
     "registerTx": "0ca49742e836fb2369a2df0e69773ef8c48933c95785a4c0a6f01c3cc64df28b",
-    "setUriTx": "f4c0f2dc17cc2e54cdd6c47dcb20e2c9d5c082e84b836cdcddfd02e01eaac92e"
+    "setUriTx": "f4c0f2dc17cc2e54cdd6c47dcb20e2c9d5c082e84b836cdcddfd02e01eaac92e",
+    "refreshTx": "caa5de358a3bf4dde993adbde266181e8996b56d32b875b7a097dc191ca73091",
+    "metadataTxs": {
+      "trackRecord": "00823e6cc231d0c577f5c2c8aecf2576048ef2bdf88d700ed53c93641cc74566",
+      "trackRecordUrl": "3aa344800c5b2f2676e7a05958cce66d6befd3aefac43183ba63a020ca607287"
+    }
   },
   "holders": {
     "tokenId": 983,
     "tokenAddress": "JyP9XwjUTQ5BqA1U88GxH",
     "agentUri": "https://api.sentinelagent.pro/agents/holders/agent-card.json",
-    "metadataHash": "8244ae3fdcd5cbf80deea55f411d76fb4bdeec5167f74e5935657a56564c14da",
+    "metadataHash": "f33cb9b3fefb5624990eafb745d00118b0b0fb476ca9db489b53bb0c0dd80c5a",
     "registerTx": "0288c105b25dcab3ee99050ba17a0004c806e3cac576a83d81c60e7d9cc43d7b",
-    "setUriTx": "3a48834a7e1da1a291929d3eabf8a07c435d66bebf0bb8d01dde816cd6be26fd"
+    "setUriTx": "3a48834a7e1da1a291929d3eabf8a07c435d66bebf0bb8d01dde816cd6be26fd",
+    "refreshTx": "d99c6e21bab405c955bf5002b7dc0692fdb7e0cb0e7665f26aea7f2c450eb1b9",
+    "metadataTxs": {
+      "trackRecord": "708b336270ed3663e7b94bd7eead9a346b9e070f76562bb80e0d41e4b40d5290",
+      "trackRecordUrl": "fc59d8fca4584bbfdf9cd1a1abde0ded82b801d80d7991a1c537f7361af69ef2"
+    }
   },
   "snipers": {
     "tokenId": 984,
     "tokenAddress": "JyP9XxpxPRa7fHFHdSi8f",
     "agentUri": "https://api.sentinelagent.pro/agents/snipers/agent-card.json",
-    "metadataHash": "db93c76df21cecff7454dc9a529ca36d0ab0794b8bf39894ab93ca5f3dbfb6bf",
+    "metadataHash": "68abf79c810a0e2fbf97ee3b6430bc9587730b89c5feb091cfd5a99b345928ee",
     "registerTx": "7e9a831c1ab6f181f4376079a997165ac35233c3e20b6277d81310e9786b2b56",
-    "setUriTx": "1b9ec8b511f60c76ac782abbdf6b61f1812616faf78782673e50ed6559455066"
+    "setUriTx": "1b9ec8b511f60c76ac782abbdf6b61f1812616faf78782673e50ed6559455066",
+    "refreshTx": "702c39dd5de35ae96a7293e5cb3b82b11c788642584d99c2c299fc685002198a",
+    "metadataTxs": {
+      "trackRecord": "75b6e937769fe3dec0da9a08f2dbb658ae5599c58eafd2a008474dd2944ee242",
+      "trackRecordUrl": "26e0898719d3a9496b471c44e53e4dc7149c1b0c750cd8378b14535dba1d5f3a"
+    }
   },
   "funding": {
     "tokenId": 985,
     "tokenAddress": "JyP9XyvSKT53VQV4eCrRY",
     "agentUri": "https://api.sentinelagent.pro/agents/funding/agent-card.json",
-    "metadataHash": "e3687f4bec0ed50e509a7e998c197fae8d1d66fd4f84749fbab3acb77b187e0a",
+    "metadataHash": "f8bbf2ccd3dd8d515cf20d99ba9c9cdf1c2ef69da58ce7aec832e359dc0b1346",
     "registerTx": "3c97f1ba76c82f6fa5241c00dc523280b131435808192d06b8c77b652e437b8d",
-    "setUriTx": "6050a2d88379b18392ecc45f0ccc30a54f56920d89ec9d9e205beecd5c2778bc"
+    "setUriTx": "6050a2d88379b18392ecc45f0ccc30a54f56920d89ec9d9e205beecd5c2778bc",
+    "refreshTx": "981bd78b81b754d9c9a5ee305045488df1f445ca74c5f25c49a6b699fd4b1564",
+    "metadataTxs": {
+      "trackRecord": "a0171dbbd37e619b9cff6b90df51a05200a7b4156aadab74b09c025a4aad7f64",
+      "trackRecordUrl": "46838e09d81ac6e2059acdce6420e0a127f93eface3a62e9fd477bc521101c5c"
+    }
   },
   "creator": {
     "tokenId": 986,
     "tokenAddress": "JyP9Y11vFUZyKXirwTVGZ",
     "agentUri": "https://api.sentinelagent.pro/agents/creator/agent-card.json",
-    "metadataHash": "e9f913867494fec65d169eb84cad7f52911786b77270097f6cef800a26c9b4cb",
+    "metadataHash": "5ff6c5f595400b4e5f4722a862f184771ed915e87d607b2c328f23bf7552c5fd",
     "registerTx": "090e21bfb622e0793e689d2839f687b94f3eb3629a910c768ead122cdea17055",
-    "setUriTx": "ee869ff11e28556b1cf20e03f8d9fe0154058288d3cbf3b7db5fccdf399e06d0"
+    "setUriTx": "ee869ff11e28556b1cf20e03f8d9fe0154058288d3cbf3b7db5fccdf399e06d0",
+    "refreshTx": "45bf1a2577bf5ea02e94ad0229c6aad3d5c1a8ac0f0badb5feb88737e83c88a4",
+    "metadataTxs": {
+      "trackRecord": "556403246ef7d123a6fbcd4dcf76f34453e26b7bef39b10000be0f7258ceabcc",
+      "trackRecordUrl": "35bec28763f9c9dc6f49e5edad0e081311ba14aad609a8624712326d239d8b11"
+    }
   },
   "contract": {
     "tokenId": 987,
     "tokenAddress": "JyP9Y27QBW4u9exdA4hkR",
     "agentUri": "https://api.sentinelagent.pro/agents/contract/agent-card.json",
-    "metadataHash": "7dcedf200cc9365d9cdbb3fc8b00ded144cd76cfd65f8a0de5b7304256834a76",
+    "metadataHash": "b5c82d4631599897fd35cee26991e01be2f4d6c6d27cc06222abaf02d87de438",
     "registerTx": "27916d5678b65aa707c2df9161b77d19676767035988b78473f74703c307a2e1",
-    "setUriTx": "1e6c99d46d0399e7ccfba2ff1d3543fd6ed154d27ab1cb088f4dc0aff501c05c"
+    "setUriTx": "1e6c99d46d0399e7ccfba2ff1d3543fd6ed154d27ab1cb088f4dc0aff501c05c",
+    "refreshTx": "e558fc0b4b0bea6d8b94f5729f646b9c263c99d2eb521ee53fd7c5faf5d46edf",
+    "metadataTxs": {
+      "trackRecord": "dfe392ddb76c82aba99bbf20d34fedafdfca5541862cf18d4930a6660afeaaf5",
+      "trackRecordUrl": "36ba41c96b102351aa58e7ceb3ef840239e836e8bd747fc3afe4ff5b7899026b"
+    }
   },
   "market": {
     "tokenId": 988,
     "tokenAddress": "JyP9Y3Ct7XZpynCTKGUka",
     "agentUri": "https://api.sentinelagent.pro/agents/market/agent-card.json",
-    "metadataHash": "f9591c81df272b0b68bebadb5017321b9f91e98ee8978b96aa94bbbf6dba42b1",
+    "metadataHash": "a96a9508979b6f5dba69eda6d0e78d5966017939d3ee50bbb369800689f87f49",
     "registerTx": "5959336483fdf6415cfc1e39e03310c0c916693ad9759b295b933f49df37fa58",
-    "setUriTx": "7fad77411fb81c4269d669fe5bb67455532aeaeb29264ec4c464b35e22ed403e"
+    "setUriTx": "7fad77411fb81c4269d669fe5bb67455532aeaeb29264ec4c464b35e22ed403e",
+    "refreshTx": "ce9c55d0cabf53f26dc83a6d8bd71bcfcfee1f0e9626e35ca86dd5b415d8cfc1",
+    "metadataTxs": {
+      "trackRecord": "ad7de40e49f63c2da8f8f1069d2556b2961f80a9b98d546c4637100f1485c852",
+      "trackRecordUrl": "78f620fed5852de73b2c2d6df46381c248eec9bef385427807f06d598ed96150"
+    }
   },
   "flows": {
     "tokenId": 989,
     "tokenAddress": "JyP9Y4JN3Z4kouSAhLdSi",
     "agentUri": "https://api.sentinelagent.pro/agents/flows/agent-card.json",
-    "metadataHash": "a503281901ebd06c90998cb580d3ac6e1d4dc5afebb6ddd1cfaba5e86308c9b2",
+    "metadataHash": "c1bcc2e5f8a90983c1cbff804c7140de87ff54489bbc2adcb7b2f3e2eda611a8",
     "registerTx": "4a9d9ab0d601ae2c4bc394d9f6a1482a319a9cb21d3f179e5c969f9765cbaf76",
-    "setUriTx": "f48defb2305066eb4bc49fb2bb0ba7e9f5a58ee1219a7adb8e2bb6f09ce48407"
+    "setUriTx": "f48defb2305066eb4bc49fb2bb0ba7e9f5a58ee1219a7adb8e2bb6f09ce48407",
+    "refreshTx": "a5a369dc0426fb208c327fc802c824a50f5987bd15af00c8d0d3b3a673d4d1d4",
+    "metadataTxs": {
+      "trackRecord": "5d73c2c101420b07594be5874e50c17c1bc064ed406d7e8464b78cbc3b039891",
+      "trackRecordUrl": "9de13b358bf7fbd4a607ab8d606e32ee2b3f70046ce9abf8067d30f2870806cf"
+    }
   }
 }

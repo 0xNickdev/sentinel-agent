@@ -64,9 +64,11 @@ if (metadata) {
   for (const key of Object.keys(registry) as SentinelAgentKey[]) {
     const reg = registry[key];
     const s: Summary | undefined = key === 'judge' || key === 'gateway' ? h?.judge : h?.agents.find(a => a.agent === key)?.summary;
-    const record = { horizon: h?.label ?? null, graded: s?.n ?? 0, brier: s?.brier ?? null, skill: s?.skill ?? null, verdicts: track.verdicts, asOf, source: `${baseUrl}/track` };
+    // The registry caps metadata values well below a JSON blob, so the record is one compact line (< 64 bytes).
+    const f = (x: number | null | undefined, d: number) => (x == null ? '-' : x.toFixed(d));
+    const record = `${h?.label ?? '-'} n=${s?.n ?? 0} brier=${f(s?.brier, 4)} skill=${f(s?.skill, 2)} asOf=${asOf}`;
     reg.metadataTxs ??= {};
-    for (const [k, v] of [['trackRecord', JSON.stringify(record)], ['trackRecordUrl', `${baseUrl}/track`]] as const) {
+    for (const [k, v] of [['trackRecord', record], ['trackRecordUrl', `${baseUrl}/track`]] as const) {
       const u = await callRegistryTool<BuiltUpdate>('build_set_metadata', { network, token_id: reg.tokenId, key: k, value_hex: hex(v), sender: ownerAddress });
       const r = await send(u);
       reg.metadataTxs[k] = r.hash;
