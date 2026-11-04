@@ -50,6 +50,29 @@ export interface AgentCardInput {
   /** on-chain token id once minted; null before */
   tokenId?: number | null;
   agentWallet?: string | null;
+  /** ERC-8004 registration-file fields the hosted builder does not emit; merged into the card before hashing */
+  erc8004?: Erc8004Fields;
+  /** CIS-8-bound external key shown in the card (identifier = the key's native address, e.g. Solana base58) */
+  externalReference?: { kind: 'Cis8'; namespace: string; identifier: string } | null;
+}
+
+/** The ERC-8004 registration-v1 fields that make the card a valid ERC-8004 registration file as well as an A2A card. */
+export interface Erc8004Fields {
+  image: string;
+  services: Array<{ name: string; endpoint: string; version?: string }>;
+  x402Support: boolean;
+  active: boolean;
+  supportedInterfaces?: Array<{ url: string; protocolBinding: string; protocolVersion: string }>;
+}
+
+export const ERC8004_TYPE = 'https://eips.ethereum.org/EIPS/eip-8004#registration-v1';
+
+/** Add the ERC-8004 fields to a built card; returns the exact bytes to host and their sha256. */
+export function withErc8004(cardJson: string, f: Erc8004Fields): { json: string; hash: string } {
+  const card = JSON.parse(cardJson) as Record<string, unknown>;
+  const out = { type: ERC8004_TYPE, ...card, image: f.image, services: f.services, x402Support: f.x402Support, active: f.active, ...(f.supportedInterfaces ? { supportedInterfaces: f.supportedInterfaces } : {}) };
+  const json = JSON.stringify(out, null, 2);
+  return { json, hash: sha256Hex(json) };
 }
 
 export interface BuiltCard {
@@ -75,6 +98,7 @@ export async function buildAgentCard(network: Network, input: AgentCardInput, op
     ...(input.documentationUrl ? { documentation_url: input.documentationUrl } : {}),
     token_id: input.tokenId ?? null,
     agent_wallet: input.agentWallet ?? null,
+    ...(input.externalReference ? { external_reference: input.externalReference } : {}),
   }, opts ?? {});
   // Trust but verify: the hash we pin on-chain must be the hash of the bytes we host.
   const local = sha256Hex(card.agent_card_json);

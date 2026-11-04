@@ -1,6 +1,7 @@
 {
+  "type": "https://eips.ethereum.org/EIPS/eip-8004#registration-v1",
   "name": "Sentinel",
-  "description": "Accountable anti-rug oracle for Solana tokens: a swarm of six specialist agents and a judge returns a verdict (SAFE / CAUTION / DANGER / RUGGED) with evidence, confidence and an on-chain audit record. Pay per query over x402.",
+  "description": "Accountable anti-rug oracle for Solana tokens: a swarm of seven specialist agents, an advocate and a judge returns a verdict (SAFE / CAUTION / DANGER / RUGGED) with evidence and confidence. Every verdict is signed and anchored on Concordium before the outcome, then graded at 1h, 24h and 7d on a public track record. Pay per query over x402.",
   "url": "https://api.sentinelagent.pro/.well-known/agent-card.json",
   "version": "1.0.0",
   "defaultInputModes": [
@@ -54,10 +55,11 @@
             "cis8004": "ccd:4221332d34e1694168c2a0c0b3fd0f27:12802.0",
             "cis8": "ccd:4221332d34e1694168c2a0c0b3fd0f27:12801.0"
           },
-          "services": {
-            "mcp": "https://api.sentinelagent.pro/mcp",
-            "a2a": "https://api.sentinelagent.pro/a2a",
-            "x402": "https://api.sentinelagent.pro/x402/verdict"
+          "externalReference": {
+            "kind": "Cis8",
+            "namespace": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
+            "identifier": "3QtXHLffyBqQGnrtLrogXkHgt8sbTtKy4ZhGNBR8TX9c",
+            "contractAddress": "ccd:4221332d34e1694168c2a0c0b3fd0f27:12801.0"
           },
           "verify": "Resolve tokenAddress via CIS-8004 agent_of; confirm owner + status=Active + card SHA-256 == metadata_hash.",
           "verification": {
@@ -72,13 +74,48 @@
   },
   "provider": {
     "organization": "Sentinel",
-    "url": "https://api.sentinelagent.pro"
+    "url": "https://sentinelagent.pro"
   },
-  "documentationUrl": "https://api.sentinelagent.pro/docs",
+  "documentationUrl": "https://sentinelagent.pro/docs",
   "registrations": [
     {
       "agentId": 981,
       "agentRegistry": "ccd:4221332d34e1694168c2a0c0b3fd0f27:12802.0"
+    }
+  ],
+  "image": "https://sentinelagent.pro/favicon.ico",
+  "services": [
+    {
+      "name": "MCP",
+      "endpoint": "https://api.sentinelagent.pro/mcp",
+      "version": "2025-06-18"
+    },
+    {
+      "name": "A2A",
+      "endpoint": "https://api.sentinelagent.pro/a2a",
+      "version": "1.0"
+    },
+    {
+      "name": "x402",
+      "endpoint": "https://api.sentinelagent.pro/x402/verdict",
+      "version": "2"
+    },
+    {
+      "name": "track-record",
+      "endpoint": "https://api.sentinelagent.pro/track"
+    },
+    {
+      "name": "web",
+      "endpoint": "https://sentinelagent.pro/agents"
+    }
+  ],
+  "x402Support": true,
+  "active": true,
+  "supportedInterfaces": [
+    {
+      "url": "https://api.sentinelagent.pro/a2a",
+      "protocolBinding": "JSONRPC",
+      "protocolVersion": "1.0"
     }
   ]
 }

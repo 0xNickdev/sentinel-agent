@@ -1,4 +1,5 @@
 {
+  "type": "https://eips.ethereum.org/EIPS/eip-8004#registration-v1",
   "name": "Sentinel Judge",
   "description": "Weighs the seven specialist findings under the consensus rule (veto, confidence-weighted mean, debate) and writes the verdict and the audit record.",
   "url": "https://api.sentinelagent.pro/agents/judge/agent-card.json",
@@ -45,9 +46,6 @@
             "cis8004": "ccd:4221332d34e1694168c2a0c0b3fd0f27:12802.0",
             "cis8": "ccd:4221332d34e1694168c2a0c0b3fd0f27:12801.0"
           },
-          "services": {
-            "a2a": "https://api.sentinelagent.pro/a2a/judge"
-          },
           "verify": "Resolve tokenAddress via CIS-8004 agent_of; confirm owner + status=Active + card SHA-256 == metadata_hash.",
           "verification": {
             "service": "Concordium Agent Registry",
@@ -61,13 +59,48 @@
   },
   "provider": {
     "organization": "Sentinel",
-    "url": "https://api.sentinelagent.pro"
+    "url": "https://sentinelagent.pro"
   },
-  "documentationUrl": "https://api.sentinelagent.pro/docs",
+  "documentationUrl": "https://sentinelagent.pro/docs",
   "registrations": [
     {
       "agentId": 982,
       "agentRegistry": "ccd:4221332d34e1694168c2a0c0b3fd0f27:12802.0"
+    }
+  ],
+  "image": "https://sentinelagent.pro/favicon.ico",
+  "services": [
+    {
+      "name": "MCP",
+      "endpoint": "https://api.sentinelagent.pro/mcp",
+      "version": "2025-06-18"
+    },
+    {
+      "name": "A2A",
+      "endpoint": "https://api.sentinelagent.pro/a2a",
+      "version": "1.0"
+    },
+    {
+      "name": "x402",
+      "endpoint": "https://api.sentinelagent.pro/x402/verdict",
+      "version": "2"
+    },
+    {
+      "name": "track-record",
+      "endpoint": "https://api.sentinelagent.pro/track"
+    },
+    {
+      "name": "web",
+      "endpoint": "https://sentinelagent.pro/agents"
+    }
+  ],
+  "x402Support": false,
+  "active": true,
+  "supportedInterfaces": [
+    {
+      "url": "https://api.sentinelagent.pro/a2a",
+      "protocolBinding": "JSONRPC",
+      "protocolVersion": "1.0"
     }
   ]
 }

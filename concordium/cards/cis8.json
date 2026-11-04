@@ -1,0 +1,18 @@
+{
+  "network": "testnet",
+  "contract": {
+    "index": 12801,
+    "subindex": 0
+  },
+  "owner": "4XB5Fr1jgcp9SuqTQQwyfiY7L6CncUQuvG1dY83ASpN9S4ZDhh",
+  "externalKey": {
+    "namespace": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
+    "key_type": "ed25519",
+    "public_key_hex": "23d5fd1a624a6cc9791bcd64680373eae9664182ccebbd0e613388ad847b28ab"
+  },
+  "registerTx": "1b41716219aa7fb7b458afcffc8c7a1a48ae5dea7f0449ef33a42ae6b06305c3",
+  "explorer": "https://testnet.ccdscan.io/transactions/1b41716219aa7fb7b458afcffc8c7a1a48ae5dea7f0449ef33a42ae6b06305c3",
+  "agentLinks": {
+    "981": "9fe3492198e1ba20b14519db272324caee991a490b535f3864885a970d4d5e2b"
+  }
+}

@@ -39,6 +39,21 @@ describe('agent manifest', () => {
       expect(c.description.length).toBeLessThanOrEqual(2048);
       expect(c.skills.length).toBeGreaterThan(0);
     }
-    expect(cards.gateway.services).toMatchObject({ mcp: 'https://sentinel.example/mcp', a2a: 'https://sentinel.example/a2a' });
+    // ERC-8004 services: every agent is reached through the gateway's MCP and A2A endpoints.
+    const services = Object.fromEntries((cards.gateway.erc8004?.services ?? []).map(s => [s.name, s.endpoint]));
+    expect(services).toMatchObject({ MCP: 'https://sentinel.example/mcp', A2A: 'https://sentinel.example/a2a' });
+    expect(cards.gateway.erc8004?.x402Support).toBe(true);
+    expect(cards.holders.erc8004?.x402Support).toBe(false);
+  });
+});
+
+describe('ERC-8004 registration fields', () => {
+  it('adds type, services, x402Support, active and image, and hashes the exact bytes', async () => {
+    const { withErc8004, ERC8004_TYPE, sha256Hex } = await import('../src/registry.js');
+    const { json, hash } = withErc8004(JSON.stringify({ name: 'A', url: 'u' }), { image: 'i', services: [{ name: 'MCP', endpoint: 'e' }], x402Support: true, active: true });
+    const c = JSON.parse(json);
+    expect(c.type).toBe(ERC8004_TYPE);
+    expect(c).toMatchObject({ name: 'A', image: 'i', x402Support: true, active: true });
+    expect(hash).toBe(sha256Hex(json));
   });
 });
