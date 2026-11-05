@@ -162,6 +162,8 @@ export interface TokenSnapshot {
   market?: MarketData | null;
   /** SOL trails out of the creator and selling insiders after their last sell; null when no Helius key or the trace was skipped */
   flows?: FlowTrail[] | null;
+  /** lanes a quick snapshot could not read (e.g. 'holders' when the RPC refuses the largest-accounts query) */
+  unavailable?: string[];
   /** a Concordium ID proof bound to the creator wallet; attached at verdict time, never fetched from Solana */
   creatorProof?: CreatorProof | null;
   /** snapshot time, unix seconds */

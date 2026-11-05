@@ -55,6 +55,13 @@ export function sentinelApp(o: SentinelAppOptions): Hono {
   }
   // REST twin of the sentinel_agents tool for the showcase site.
   app.get('/api/agents', c => c.json({ network: o.network, agents: agentDirectory(mcpOpts), price: o.paywall ? { microCcd: o.paywall.priceMicroCcd, payTo: o.paywall.payTo } : null, attestation: { alg: 'ML-DSA-65', publicKey: o.service.keys.publicKeyHex }, cis8 }));
+  // Fast tier: engine rules only, no models, free and rate limited like every unpaid route.
+  app.get('/quick/:mint', async c => {
+    const mint = c.req.param('mint');
+    if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(mint)) return c.json({ error: 'not a Solana mint' }, 400);
+    try { return c.json(await o.service.quick(mint), 200, { 'cache-control': 'public, max-age=30' }); }
+    catch (e) { o.log?.(`quick · ${mint.slice(0, 6)} failed: ${e instanceof Error ? e.message : String(e)}`); return c.json({ error: 'quick check failed' }, 502); }
+  });
   // Verified creators (Concordium Verify and Access, in-process). Free: the sponsor pays both anchors.
   const ids = o.creatorProofs ?? null;
   const SOL = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;

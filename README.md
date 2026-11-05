@@ -226,6 +226,7 @@ Only authorised submitters can write. Nothing can be updated or deleted. Each ho
 
 | Tool | Price | Returns |
 |---|---|---|
+| `sentinel_quick { mint }` | free | first look in about a second for fresh launches: authorities, extensions, holders, liquidity, market; engine rules, no models; says what it did not read · also `GET /quick/:mint` |
 | `sentinel_verdict { mint }` | 1 CCD over x402 | verdict, evidence, dissent, attestation; progress as notifications |
 | `sentinel_track { limit? }` | free | Brier, skill, reliability, per-specialist scores, graded verdicts |
 | `sentinel_audit { digest? \| mint? }` | free | past verdicts with their Concordium records |

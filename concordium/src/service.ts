@@ -3,8 +3,8 @@
 // Streams swarm events to whoever is listening for the request.
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { AnthropicLLM, judgeToken, keysFromEnv, signVerdict, type AttestationKeys, type LLM, type SwarmEvent, type Verdict } from '@sentinel/agents';
-import { SolanaAdapter, type CreatorProof, type LaunchEvent, type LaunchFeed, type Outcome, type TokenSnapshot } from '@sentinel/engine';
+import { AnthropicLLM, CONSENSUS, detectVetoes, judgeToken, keysFromEnv, scoreToBand, signVerdict, type AttestationKeys, type LLM, type SwarmEvent, type Verdict } from '@sentinel/agents';
+import { SolanaAdapter, analyze, type CreatorProof, type LaunchEvent, type LaunchFeed, type Outcome, type TokenSnapshot } from '@sentinel/engine';
 import type { AuditClient } from './audit.js';
 import type { Account } from './chain.js';
 import { explorerTx } from './chain.js';
@@ -29,6 +29,26 @@ export interface VerdictServiceOptions {
 
 /** An outcome grade attached to a stored verdict, with the chain anchor of the grade when it was recorded. */
 export interface StoredOutcome extends Outcome { concordiumTx: string | null }
+
+/** A sub-second-to-seconds read with no models: contract, holders, liquidity and market rules only. */
+export interface QuickVerdict {
+  tier: 'fast';
+  mint: string;
+  /** SAFE / CAUTION / DANGER from the engine's rules; RUGGED is only ever called by the full swarm */
+  verdict: 'SAFE' | 'CAUTION' | 'DANGER';
+  riskScore: number;
+  flags: Array<{ code: string; severity: string; message: string }>;
+  /** flags that floor the verdict at DANGER (live mint/freeze authority, drained liquidity, …) */
+  vetoes: string[];
+  checked: string[];
+  notChecked: string[];
+  market: { symbol: string | null; liquidityUsd: number; fdvUsd: number | null; volume24hUsd: number } | null;
+  ms: number;
+  at: number;
+  cached: boolean;
+  /** the last full swarm verdict on this mint, if any */
+  full: { verdict: string; riskScore: number; at: number; digest: string; concordiumTx: string | null } | null;
+}
 
 export interface StoredVerdict extends Verdict {
   stored: { at: number; auditSeq: number | null; auditExplorer: string | null };
@@ -80,6 +100,46 @@ export class VerdictService {
       o.launchFeed.on('error', e => o.log?.(`launch · feed error: ${e.message}`));
       try { o.launchFeed.start(); } catch (e) { o.log?.(`launch · feed failed to start: ${e instanceof Error ? e.message : String(e)}`); }
     }
+  }
+
+  private readonly quickCache = new Map<string, QuickVerdict>();
+
+  /** Fast tier: engine rules on a light snapshot, no LLM, cached 60 s. The launch, funding, creator and flow lanes are not read. */
+  async quick(mint: string): Promise<QuickVerdict> {
+    if (!isMint(mint)) throw new Error(`not a Solana mint: ${mint}`);
+    const hit = this.quickCache.get(mint);
+    if (hit && Date.now() / 1000 - hit.at < 60) return { ...hit, cached: true };
+    const t0 = Date.now();
+    let snap: TokenSnapshot;
+    try { snap = await this.adapter.quickSnapshot(mint); }
+    catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (!this.fallback || !/\b(401|403|429)\b|Forbidden|Unauthorized|Too Many/i.test(msg)) throw e;
+      snap = await this.fallback.quickSnapshot(mint);
+    }
+    const ev = analyze(snap);
+    const vetoes = detectVetoes(ev).map(v => v.code);
+    const flags = ev.flags.map(f => ({ code: f.code, severity: f.severity, message: f.message }));
+    // No pools means the liquidity rules had nothing to read: absence of evidence is never SAFE.
+    if (!snap.market) flags.push({ code: 'no_market', severity: 'warn', message: 'No trading pools found: liquidity and market shape could not be checked.' });
+    const noHolders = snap.unavailable?.includes('holders') ?? false;
+    if (noHolders) flags.push({ code: 'holders_unavailable', severity: 'info', message: 'The RPC refused the holder query for this mint; concentration was not checked.' });
+    let riskScore = 100 - ev.baselineScore;
+    if (!snap.market) riskScore = Math.max(riskScore, CONSENSUS.cautionFrom);
+    const band = vetoes.length ? 'DANGER' : scoreToBand(riskScore);
+    const prev = this.byMint.get(mint);
+    const q: QuickVerdict = {
+      tier: 'fast', mint, verdict: band === 'RUGGED' ? 'DANGER' : band, riskScore, vetoes,
+      flags,
+      checked: ['mint and freeze authority', 'Token-2022 extensions', 'metadata mutability', ...(noHolders ? [] : ['holder concentration', 'burned and locked supply']), ...(snap.market ? ['liquidity and pools', 'market shape'] : [])],
+      notChecked: [...(noHolders ? ['holder concentration'] : []), ...(snap.market ? [] : ['liquidity and pools']), 'snipers and bundles', 'funding graph', 'creator behaviour and history', 'money flow after sells', 'agent reasoning'],
+      market: snap.market ? { symbol: snap.market.symbol ?? null, liquidityUsd: snap.market.liquidityUsd, fdvUsd: snap.market.fdvUsd ?? null, volume24hUsd: snap.market.volume24hUsd } : null,
+      ms: Date.now() - t0, at: Math.floor(Date.now() / 1000), cached: false,
+      full: prev ? { verdict: prev.verdict, riskScore: prev.riskScore, at: prev.stored.at, digest: prev.attestation.digest, concordiumTx: prev.attestation.concordiumTx } : null,
+    };
+    this.quickCache.set(mint, q);
+    if (this.quickCache.size > 500) this.quickCache.delete(this.quickCache.keys().next().value!);
+    return q;
   }
 
   /** Newest first, at most 50. */

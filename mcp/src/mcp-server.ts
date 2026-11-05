@@ -152,6 +152,20 @@ export function createMcpServer(o: McpOptions): McpServer {
     }
   });
 
+  server.registerTool('sentinel_quick', {
+    title: 'Sentinel quick check (free, no models)',
+    description: 'Fast first look at a Solana token in about a second for fresh launches (a few seconds for large tokens): mint and freeze authority, Token-2022 extensions, holder concentration, liquidity and market shape, scored by the same deterministic rules the swarm starts from. No LLM, free, cached 60 s. It does NOT read snipers, bundles, the funding graph, the creator or money flows: call sentinel_verdict (paid) for the full, signed, on-chain-anchored verdict. Returns verdict SAFE/CAUTION/DANGER, riskScore 0-100, flags, vetoes, what was and was not checked, and the last full verdict on this mint if one exists.',
+    inputSchema: { mint: z.string().describe('Solana token mint address (base58)') },
+    annotations: { readOnlyHint: true, openWorldHint: true },
+  }, async ({ mint }) => {
+    try {
+      const q = await o.service.quick(mint.trim());
+      return { content: [{ type: 'text', text: JSON.stringify(q, null, 2) }], structuredContent: q as unknown as Record<string, unknown> };
+    } catch (e) {
+      return { content: [{ type: 'text', text: `quick check failed: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+    }
+  });
+
   server.registerTool('sentinel_track', {
     title: 'Sentinel track record',
     description: 'How good are Sentinel\'s calls? Every verdict is sealed on Concordium before the outcome and graded after it (1h, 24h, 7d) with published labels: TVL rug = liquidity down more than 99%, idle = no trades left. Returns Brier score, log score, skill against the base rate, a reliability diagram and per-specialist scores, plus recent graded verdicts. riskScore/100 is the forecast probability of rug. Use this before trusting a verdict.',

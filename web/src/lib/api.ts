@@ -45,6 +45,9 @@ export interface Verdict {
   outcomes?: Outcome[];
 }
 
+/** GET /quick/:mint: the fast tier, engine rules only, no models. */
+export interface QuickVerdict { tier: "fast"; mint: string; verdict: "SAFE" | "CAUTION" | "DANGER"; riskScore: number; flags: Array<{ code: string; severity: string; message: string }>; vetoes: string[]; checked: string[]; notChecked: string[]; market: { symbol: string | null; liquidityUsd: number; fdvUsd: number | null; volume24hUsd: number } | null; ms: number; at: number; cached: boolean; full: { verdict: string; riskScore: number; at: number; digest: string; concordiumTx: string | null } | null }
+
 export interface AgentInfo { key: string; name: string; role: string; tokenId: number | null; badge: string | null; badgeCheck: string | null; card: string; cardTx?: string | null; trackRecordTx?: string | null }
 /** Sentinel's Solana ed25519 key bound to the owner's Concordium account in the CIS-8 External Key Registry. */
 export interface Cis8Binding { network: string; contract: { index: number; subindex: number }; owner: string; externalKey: { namespace: string; key_type: string; public_key_hex: string }; registerTx: string; explorer: string; agentLinks?: Record<string, string> }

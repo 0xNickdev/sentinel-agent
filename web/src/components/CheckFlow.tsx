@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { AGENTS, STREAM, type Finding, type SwarmEvent, type Verdict } from "@/lib/api";
+import { AGENTS, STREAM, getJSON, type Finding, type QuickVerdict, type SwarmEvent, type Verdict } from "@/lib/api";
 import { WORD } from "@/lib/verdict";
 import { CheckPill } from "./CheckPill";
 import { SwarmCanvas, type SwarmMode } from "./SwarmCanvas";
@@ -26,14 +26,17 @@ export function CheckFlow({ initialMint = "", fresh = false, nonce = "" }: { ini
   const [verdict, setVerdict] = useState<Verdict | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [startedAt, setStartedAt] = useState(0);
+  const [quick, setQuick] = useState<QuickVerdict | null>(null);
   const es = useRef<EventSource | null>(null);
   const mode: SwarmMode = stage === "idle" ? "idle" : stage === "running" ? (judge.length || advocate.length ? "converge" : "idle") : "verdict";
 
-  const reset = () => { es.current?.close(); setLanes(freshLanes()); setVetoes([]); setAdvocate([]); setJudge([]); setDebate(null); setConsensus(null); setVerdict(null); setError(null); };
+  const reset = () => { es.current?.close(); setQuick(null); setLanes(freshLanes()); setVetoes([]); setAdvocate([]); setJudge([]); setDebate(null); setConsensus(null); setVerdict(null); setError(null); };
 
   const run = useCallback((m: string, again = false) => {
     reset();
     setMint(m); setStage("running"); setStartedAt(Date.now());
+    // Fast tier first: engine rules, no models, about a second. The swarm streams in below it.
+    getJSON<QuickVerdict>(`/quick/${encodeURIComponent(m)}`).then(q => setQuick(cur => cur ?? q)).catch(() => undefined);
     const src = new EventSource(`${STREAM}/stream/verdict?mint=${encodeURIComponent(m)}${again ? "&fresh=1" : ""}`);
     es.current = src;
     const onAny = (e: MessageEvent) => {
@@ -77,6 +80,7 @@ export function CheckFlow({ initialMint = "", fresh = false, nonce = "" }: { ini
           {stage === "running" && (
             <motion.div key="running" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, scale: 0.98 }} transition={{ duration: 0.4 }} className="mx-auto w-full max-w-5xl px-4">
               <TopBar mint={mint} startedAt={startedAt} />
+              {quick && <QuickStrip q={quick} />}
               {vetoes.length > 0 && (
                 <div className="mt-4 flex flex-wrap gap-2">{vetoes.map(v => <span key={v.code} className="pill pill-red h-8 text-xs mono" title={v.message}>VETO · {v.code} · {v.agent}</span>)}</div>
               )}
@@ -175,4 +179,21 @@ function LaneView({ lane, index }: { lane: Lane; index: number }) {
 
 function ProgressDots({ active }: { active: boolean }) {
   return <span className="flex gap-1" aria-hidden="true">{[0, 1, 2, 3, 4].map(i => <motion.span key={i} className="w-1.5 h-1.5 bg-fg-3 inline-block" animate={active ? { opacity: [0.2, 1, 0.2] } : { opacity: 0.2 }} transition={{ repeat: Infinity, duration: 1.2, delay: i * 0.12 }} />)}</span>;
+}
+
+/** First look from the fast tier while the swarm works: engine rules only, and it says what it did not read. */
+function QuickStrip({ q }: { q: QuickVerdict }) {
+  const tone = q.verdict === "DANGER" ? "border-red text-red" : q.verdict === "CAUTION" ? "border-fg-3 text-fg" : "border-line-2 text-fg";
+  return (
+    <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }} className={`mt-4 rounded-2xl border bg-black/60 p-4 ${tone}`}>
+      <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+        <span className="display text-xs text-fg-4">FIRST LOOK · {(q.ms / 1000).toFixed(1)}S · NO MODELS</span>
+        <span className="display text-xl">{WORD[q.verdict]}</span>
+        <span className="mono text-xs text-fg-3">risk {q.riskScore}/100</span>
+        <span className="mono text-xs text-fg-4 ml-auto">full swarm verdict follows</span>
+      </div>
+      {q.flags.length > 0 && <div className="mt-2 flex flex-wrap gap-2">{q.flags.map(f => <span key={f.code} title={f.message} className={`pill h-7 text-[11px] mono ${f.severity === "critical" ? "pill-red" : "pill-ghost"}`}>{f.code}</span>)}</div>}
+      <div className="mt-2 mono text-[11px] text-fg-4">not read yet: {q.notChecked.join(" · ")}</div>
+    </motion.div>
+  );
 }

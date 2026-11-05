@@ -58,6 +58,25 @@ export class SolanaAdapter {
     this.opts = { maxSignatures: 600, hubThreshold: 1000, maxTrace: 16, batchSize: 10, batchDelayMs: 60, maxFlowWallets: 8, ...opts };
   }
 
+  /**
+   * Fast path: mint authorities and extensions, top holders and the market view, read in parallel (no history walk,
+   * no funder tracing, no money flow). About a second instead of tens; the launch, funding and creator lanes stay empty
+   * and the caller must say so.
+   */
+  async quickSnapshot(mint: string): Promise<TokenSnapshot> {
+    const pk = new PublicKey(mint);
+    const marketFn = this.opts.market === null ? null : (this.opts.market ?? fetchMarket);
+    const [mintInfo, market] = await Promise.all([
+      this.readMint(pk),
+      marketFn ? marketFn(mint).catch(() => null) : Promise.resolve(null),
+    ]);
+    // Some RPCs refuse the largest-accounts query on huge mints (USDC): answer without the holder lane, say so.
+    const unavailable: string[] = [];
+    const holders = await this.readHolders(pk, mintInfo.supply).catch(e => { this.opts.log?.(`quick holders: ${e instanceof Error ? e.message.slice(0, 80) : e}`); unavailable.push('holders'); return [] as Holder[]; });
+    const liquidity = liquidityFromMarket(market, this.inferLiquidity(holders, mintInfo.supply));
+    return { chain: 'solana', mint, creator: null, mintInfo, holders, trades: [], liquidity, creatorHistory: null, funders: {}, hubs: [], labels: {}, market, flows: null, at: Math.floor(Date.now() / 1000), ...(unavailable.length ? { unavailable } : {}) };
+  }
+
   async snapshot(mint: string): Promise<TokenSnapshot> {
     const pk = new PublicKey(mint);
     const mintInfo = await this.readMint(pk);
