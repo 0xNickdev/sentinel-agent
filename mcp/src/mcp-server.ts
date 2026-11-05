@@ -18,6 +18,9 @@ export interface AgentDirectory {
   badge: string | null;
   badgeCheck: string | null;
   card: string;
+  /** last setAgentURI (card pin) and the trackRecord metadata write, Concordium tx hashes */
+  cardTx?: string | null;
+  trackRecordTx?: string | null;
 }
 
 export interface McpOptions {
@@ -25,7 +28,7 @@ export interface McpOptions {
   network: Network;
   baseUrl: string;
   /** cards/registry.json contents once agents are registered */
-  registry?: Record<string, { tokenId: number; tokenAddress: string; agentUri: string }>;
+  registry?: Record<string, { tokenId: number; tokenAddress: string; agentUri: string; refreshTx?: string; setUriTx?: string; metadataTxs?: Record<string, string> }>;
   /** price shown to clients; null when verdicts are free */
   priceMicroCcd?: string | null;
   version?: string;
@@ -47,6 +50,8 @@ export function agentDirectory(o: McpOptions): AgentDirectory[] {
       badge: reg?.tokenAddress ?? null,
       badgeCheck: reg ? badgeCheckUrl(reg.tokenAddress) : null,
       card: key === 'gateway' ? `${o.baseUrl}/.well-known/agent-card.json` : `${o.baseUrl}/agents/${key}/agent-card.json`,
+      cardTx: reg?.refreshTx ?? reg?.setUriTx ?? null,
+      trackRecordTx: reg?.metadataTxs?.trackRecord ?? null,
     };
   });
 }

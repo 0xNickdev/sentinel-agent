@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { motion } from "motion/react";
-import { AGENTS, getJSON, short, type AgentsResponse } from "@/lib/api";
+import { AGENTS, ccdscanTx, getJSON, short, type AgentsResponse } from "@/lib/api";
 
 const JUDGE = { id: "judge", name: "Judge", movement: "stamp", domain: "Weighs the seven under the consensus rule: veto, weighted mean, one debate round, an advocate for the other side" };
 const GATEWAY = { id: "gateway", name: "Sentinel", movement: "door", domain: "The entry point other agents call: MCP, A2A and x402 surface of the swarm. Its Agent Card is the one pinned in the registry" };
@@ -34,6 +34,8 @@ export function AgentCards({ compact = false }: { compact?: boolean }) {
               <div className="mt-3 flex flex-wrap gap-2 mono text-[11px] relative z-10">
                 <a className="pill pill-ghost h-6 text-[10px]" href={reg.card} target="_blank" rel="noreferrer">Agent Card ↗</a>
                 {reg.badgeCheck && <a className="pill pill-ghost h-6 text-[10px]" href={reg.badgeCheck} target="_blank" rel="noreferrer">Check badge ↗</a>}
+                {reg.cardTx && <a className="pill pill-ghost h-6 text-[10px]" href={ccdscanTx(reg.cardTx)} target="_blank" rel="noreferrer">Card pinned ↗</a>}
+                {reg.trackRecordTx && <a className="pill pill-ghost h-6 text-[10px]" href={ccdscanTx(reg.trackRecordTx)} target="_blank" rel="noreferrer">Track record on-chain ↗</a>}
               </div>
             )}
             {reg?.badgeCheck && <a className="absolute inset-0" href={reg.badgeCheck} target="_blank" rel="noreferrer" aria-label={`Check ${a.name} badge`} />}

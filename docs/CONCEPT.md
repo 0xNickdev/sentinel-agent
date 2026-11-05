@@ -13,7 +13,7 @@ Every trading bot, Telegram sniper and AI assistant that touches meme coins need
 3. **Pay per answer.** Each query is a micro-payment over **x402** on Concordium testnet (CCD or PLT). No API keys, no subscriptions; agents pay agents.
 4. **Accountable by construction.** Sentinel and every specialist agent are registered in the **Concordium Agent Registry** under a **Verified by Concordium** badge: a verified human (the founder) stands behind the swarm, and that is readable from Solana/EVM via ERC-8004. Consumers check the badge before trusting a verdict.
 5. **Audit trail.** Every verdict is hashed (inputs, evidence, verdict, model versions) and appended to a Concordium testnet contract. That is the EU AI Act Art. 12 record: anyone can prove what Sentinel said, when, about what.
-6. **Verified creators.** A token creator can attach a **Concordium ID** zero-knowledge proof (real person, 18+, not sanctioned jurisdiction) to their mint. Sentinel stores nothing personal — only that the proof verified — and reports "verified human creator" as a strong positive signal. Portable across launchpads.
+6. **Verified creators (shipped).** A token creator binds their Solana wallet to a **Concordium ID** zero-knowledge proof (real person, 18+) through Verify and Access at sentinelagent.pro/verify. Sentinel stores nothing personal: the wallet, the claim, the time and two on-chain anchors (CCDVRA request, CCDVAA audit record). The proof follows the wallet, so it covers every token that wallet launches, on any launchpad.
 
 ## The swarm
 | Agent | Evidence it owns | Output |
@@ -44,7 +44,8 @@ Consensus rule: hard-fail flags (authorities live, honeypot extension, LP pullab
 1. An agent (Claude via MCP) asks Sentinel about a token. Gateway answers 402 → agent pays on Concordium testnet → verdict streams back, agents' work visible live in the UI.
 2. Verdict DANGER on a known rug, SAFE on a clean token; the funding-graph cluster is shown.
 3. Click the badge: Agent Registry entry, Verified by Concordium, Agent Card. Click the audit link: CCDExplorer transaction with the verdict hash.
-4. Creator flow: founder attaches a Concordium ID age/person proof to a test mint; Sentinel shows "verified human creator", no data stored.
+4. Creator flow: the founder connects the creator wallet at /verify, signs a challenge, proves 18+ with the Concordium wallet; Sentinel anchors the audit record and every verdict on that wallet's tokens shows "verified human creator". No data stored.
+5. Across chains: Sentinel's Solana key resolves through CIS-8 to the verified owner and through the gateway's external reference to the agent and its badge; each agent's registry metadata carries its graded track record.
 
 ## Path to production
 - First customer: CARPET (carpet.money) shows Sentinel verdicts on every token page.

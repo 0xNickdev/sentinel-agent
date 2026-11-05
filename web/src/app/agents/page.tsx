@@ -1,5 +1,6 @@
 import { AgentCards } from "@/components/AgentCards";
 import { BadgeExplainer } from "@/components/BadgeExplainer";
+import { CrossChain } from "@/components/CrossChain";
 
 export default function AgentsPage() {
   return (
@@ -9,6 +10,7 @@ export default function AgentsPage() {
         <p className="text-fg-2 max-w-md">Nine agents, one accountable owner: the gateway, the judge and seven specialists. Each is an NFT in the Concordium Agent Registry with its Agent Card pinned by hash, under a Verified by Concordium badge: a real, ID-verified person stands behind every verdict.</p>
       </div>
       <div className="mt-10"><AgentCards /></div>
+      <div className="mt-16"><CrossChain /></div>
       <div className="mt-12"><BadgeExplainer /></div>
     </div>
   );

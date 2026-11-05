@@ -32,6 +32,9 @@ export function sentinelApp(o: SentinelAppOptions): Hono {
   const registryFile = join(o.cardsDir, 'registry.json');
   const registry = existsSync(registryFile) ? JSON.parse(readFileSync(registryFile, 'utf8')) as McpOptions['registry'] : undefined;
   const gatewayCard = join(o.cardsDir, 'gateway.json');
+  // CIS-8 binding of Sentinel's Solana key to the owner (cis8-bind.ts); shown on the agents page.
+  const cis8File = join(o.cardsDir, 'cis8.json');
+  const cis8 = existsSync(cis8File) ? JSON.parse(readFileSync(cis8File, 'utf8')) as Record<string, unknown> : null;
   const mcpOpts: McpOptions = { service: o.service, network: o.network, baseUrl: o.baseUrl, ...(registry ? { registry } : {}), priceMicroCcd: o.paywall?.priceMicroCcd ?? null };
 
   const app = new Hono();
@@ -51,7 +54,7 @@ export function sentinelApp(o: SentinelAppOptions): Hono {
     });
   }
   // REST twin of the sentinel_agents tool for the showcase site.
-  app.get('/api/agents', c => c.json({ network: o.network, agents: agentDirectory(mcpOpts), price: o.paywall ? { microCcd: o.paywall.priceMicroCcd, payTo: o.paywall.payTo } : null, attestation: { alg: 'ML-DSA-65', publicKey: o.service.keys.publicKeyHex } }));
+  app.get('/api/agents', c => c.json({ network: o.network, agents: agentDirectory(mcpOpts), price: o.paywall ? { microCcd: o.paywall.priceMicroCcd, payTo: o.paywall.payTo } : null, attestation: { alg: 'ML-DSA-65', publicKey: o.service.keys.publicKeyHex }, cis8 }));
   // Verified creators (Concordium Verify and Access, in-process). Free: the sponsor pays both anchors.
   const ids = o.creatorProofs ?? null;
   const SOL = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;

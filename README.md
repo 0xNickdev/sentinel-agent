@@ -160,12 +160,15 @@ Live: [sentinelagent.pro/track](https://sentinelagent.pro/track) · `GET https:/
 
 | Component | How Sentinel uses it | Where |
 |---|---|---|
-| **Agent Registry (CIS-8004)** | nine agents, tokens 981–989, cards served byte-exact and hash-pinned | [`registry.ts`](concordium/src/registry.ts), [`cards/`](concordium/cards) |
+| **Agent Registry (CIS-8004)** | nine agents, tokens 981–989; each card is both an A2A Agent Card and an ERC-8004 registration file, served byte-exact and hash-pinned | [`registry.ts`](concordium/src/registry.ts), [`cards/`](concordium/cards) |
 | **Verified by Concordium badge** | all nine valid; owner account backed by Concordium ID | [check it](https://agent-registry-mcp.concordium.com/v1/check-badge/JyP9XuYWbM5LAuY1BXBRN?network=testnet) |
 | **Agent Registry MCP** | the demo trader agent checks Sentinel's badge before paying | [`trader-agent.ts`](concordium/src/scripts/trader-agent.ts) |
 | **x402** | 1 CCD per verdict over HTTP and MCP, in-process facilitator | [`x402.ts`](concordium/src/x402.ts) |
 | **Sponsored transactions** | the facilitator pays the fee, the calling agent holds no gas | [`x402.ts`](concordium/src/x402.ts) |
 | **Smart contract** | `sentinel_audit`: append-only verdict records and outcome grades | [`lib.rs`](concordium/audit-contract/src/lib.rs) |
+| **Concordium ID · Verify and Access** | token creators bind their Solana wallet to a zero-knowledge proof (18+); request and audit record anchored (CCDVRA, CCDVAA), nothing personal stored | [`idproof.ts`](concordium/src/idproof.ts), [sentinelagent.pro/verify](https://sentinelagent.pro/verify) |
+| **CIS-8 External Key Registry** | Sentinel's Solana key is bound to the verified owner; the gateway agent's external reference points at it, so a Solana-side caller resolves key → agent → person | [`cis8-bind.ts`](concordium/src/scripts/cis8-bind.ts), [`link-agent-key.ts`](concordium/src/scripts/link-agent-key.ts) |
+| **Registry metadata** | each agent carries `trackRecord` (graded Brier score) and `trackRecordUrl`: reputation from outcomes, not feedback | [`refresh-cards.ts`](concordium/src/scripts/refresh-cards.ts) |
 
 ### Live on testnet
 
@@ -174,6 +177,8 @@ Live: [sentinelagent.pro/track](https://sentinelagent.pro/track) · `GET https:/
 | Audit contract | [`<13039,0>`](https://testnet.ccdscan.io/contracts/13039/0) |
 | Agent Registry | CIS-8004 `<12802,0>`, CIS-8 `<12801,0>` |
 | Verdict signing key | [`/.well-known/sentinel-keys.json`](https://api.sentinelagent.pro/.well-known/sentinel-keys.json) |
+| CIS-8 binding | Solana key `3QtXHLffyBqQGnrtLrogXkHgt8sbTtKy4ZhGNBR8TX9c` → owner, [tx](https://testnet.ccdscan.io/transactions/1b41716219aa7fb7b458afcffc8c7a1a48ae5dea7f0449ef33a42ae6b06305c3); gateway external reference, [tx](https://testnet.ccdscan.io/transactions/9fe3492198e1ba20b14519db272324caee991a490b535f3864885a970d4d5e2b) |
+| Verified creator (example) | request [CCDVRA](https://testnet.ccdscan.io/transactions/609c8956bffd664ac6f81afed7946070c221eb4bb2b7e7e168663004a23e1829) · audit [CCDVAA](https://testnet.ccdscan.io/transactions/39fc901e8062e886df4473926424e65a050f8de4ea204330d8f5cae6ed6e5823) |
 
 | Agent | Token | Badge token address |
 |---|---:|---|
@@ -186,6 +191,22 @@ Live: [sentinelagent.pro/track](https://sentinelagent.pro/track) · `GET https:/
 | Contract & Liquidity | 987 | `JyP9Y27QBW4u9exdA4hkR` |
 | Market | 988 | `JyP9Y3Ct7XZpynCTKGUka` |
 | Money Flow | 989 | `JyP9Y4JN3Z4kouSAhLdSi` |
+
+### Verified creators
+
+A token creator proves, once, that a real adult stands behind their Solana wallet. Every verdict on that wallet's tokens then carries a `verified_creator` finding, weighed by the Creator agent as accountability, never as proof of good intent.
+
+```mermaid
+flowchart LR
+  W[Solana creator wallet] -->|1 connect| S[Sentinel]
+  S -->|2 anchor request CCDVRA| C[(Concordium)]
+  W -->|3 sign challenge naming the anchor| S
+  ID[Concordium wallet or ID App] -->|4 ZK proof: age 18+| S
+  S -->|5 verify and anchor audit record CCDVAA| C
+  S -->|6 verified_creator on every verdict| V[Verdicts]
+```
+
+The Verify and Access protocol runs in-process with `@concordium/web-sdk` (no Docker verifier). Sentinel enforces the presentation context itself, including the binding to the anchor block, because web-sdk 12.0.2 skips that check. Stored: wallet, claim, time, the two anchors. Not stored: name, birth date, documents.
 
 ### Contract interface
 
@@ -259,12 +280,12 @@ Testnet setup, contract deployment and agent registration: [concordium/README.md
 
 | Suite | Tests |
 |---|---:|
-| engine | 32 |
+| engine | 34 |
 | agents | 29 |
-| concordium | 14 |
+| concordium | 20 |
 | mcp | 7 |
 | audit contract (Rust) | 4 |
-| **total** | **86** |
+| **total** | **94** |
 
 ## Security
 
@@ -274,7 +295,9 @@ Prompt-injection guards treat every on-chain string as data. Inputs are validate
 
 - The badge proves that a verified person is accountable for the agents. It does not prove that a verdict is right; the track record is how you judge that.
 - Static specialist weights stand in until enough graded verdicts exist to fit them from outcomes.
-- Concordium ID proofs for token creators are planned, not shipped.
+- Creator proofs work end to end with the Concordium Wallet for Web. The Concordium ID App pairs and receives the request, but does not return a proof yet; we are working it through with Concordium.
+- A verified creator is accountable, not automatically honest; a creator planning a rug will not verify.
+- On testnet the hosted registry MCP builds CIS-8 `register` for an entrypoint the instance names `registerExternalKey`, and `get_metadata` cannot encode token ids; Sentinel serialises those calls from the contract's embedded schema.
 - Everything runs on Concordium testnet.
 
 ## Research
