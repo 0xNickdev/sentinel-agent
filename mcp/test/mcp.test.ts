@@ -28,11 +28,11 @@ async function connect(app: ReturnType<typeof makeApp>['app']) {
 }
 
 describe('MCP surface', () => {
-  it('lists the five tools and describes the agents with badges', async () => {
+  it('lists the six tools and describes the agents with badges', async () => {
     const { app } = makeApp();
     const client = await connect(app);
     const tools = await client.listTools();
-    expect(tools.tools.map(t => t.name).sort()).toEqual(['sentinel_agents', 'sentinel_audit', 'sentinel_check_badge', 'sentinel_track', 'sentinel_verdict']);
+    expect(tools.tools.map(t => t.name).sort()).toEqual(['sentinel_agents', 'sentinel_audit', 'sentinel_check_badge', 'sentinel_quick', 'sentinel_track', 'sentinel_verdict']);
     const agents = await client.callTool({ name: 'sentinel_agents', arguments: {} }) as { structuredContent: { agents: Array<{ key: string; badge: string | null; badgeCheck: string | null }> } };
     expect(agents.structuredContent.agents).toHaveLength(9);
     const gw = agents.structuredContent.agents.find(a => a.key === 'gateway')!;
