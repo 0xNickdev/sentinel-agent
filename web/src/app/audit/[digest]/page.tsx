@@ -6,6 +6,7 @@ import { VerifySignature } from "@/components/VerifySignature";
 import { JudgeBrief } from "@/components/JudgeBrief";
 import { FindingCards } from "@/components/FindingCards";
 import { MoneyFlow } from "@/components/MoneyFlow";
+import { ConnectionGraph } from "@/components/ConnectionGraph";
 import { OutcomeChips, OutcomeTable } from "@/components/Outcomes";
 import { Transcript } from "@/components/Transcript";
 import { CopyButton } from "@/components/CopyButton";
@@ -76,7 +77,8 @@ export default async function AuditRecord({ params }: { params: Promise<{ digest
       </Section>
 
       <Section title="FINDINGS">
-        <FindingCards findings={v.findings} notable={4} cols="md:grid-cols-2" />
+        <ConnectionGraph v={v} />
+        <div className="mt-3"><FindingCards findings={v.findings} notable={4} cols="md:grid-cols-2" evidence={v.evidence} /></div>
       </Section>
 
       <Section title="EVIDENCE">

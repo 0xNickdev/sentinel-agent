@@ -37,7 +37,17 @@ export interface Verdict {
   consensus: { rule: string; weightedScore: number; spread: number; suggestedBand: Band; completeness: { score: number; missing: string[] }; debateRounds: number; debated: string[]; failed: string[] };
   judge: { model: string; ms: number; overridden: string[] };
   flags: Array<{ code: string; severity: string; message: string }>;
-  evidence: { market: { symbol: string | null; name: string | null; liquidityUsd: number; fdvUsd: number | null; volume24hUsd: number; pairs: number; topVenue: string | null } | null; holders: { top10Pct: number; count: number }; linked: { linkedPct: number; linkedToCreatorPct: number; checked: number; clusters: Array<{ funder: string; wallets: string[]; pct: number; viaCreator: boolean }> }; snipers: { boughtPct: number; holdingPct: number; wallets: string[] }; bundles: { groups: number; wallets: number; boughtPct: number }; flows?: FlowsSummary | null; creator?: { address: string | null; status: string } };
+  evidence: {
+    market: { symbol: string | null; name: string | null; liquidityUsd: number; fdvUsd: number | null; volume24hUsd: number; pairs: number; topVenue: string | null } | null;
+    holders: { top10Pct: number; count: number; top?: Array<{ owner: string; pct: number; isCreator: boolean; isSniper: boolean }>; programHeldPct?: number; lockedPct?: number; burnedPct?: number | null };
+    linked: { linkedPct: number; linkedToCreatorPct: number; checked: number; clusters: Array<{ funder: string; wallets: string[]; pct: number; viaCreator: boolean }>; exchangeFunded?: Array<{ wallet: string; exchange: string }> };
+    snipers: { boughtPct: number; holdingPct: number; wallets: string[] };
+    bundles: { groups: number; wallets: number; boughtPct: number; heldPct?: number; largestGroup?: number };
+    flows?: FlowsSummary | null;
+    creator?: { address: string | null; status: string; holdingPct?: number; boughtTokens?: number; soldTokens?: number; lockedPct?: number; proof?: unknown };
+    contract?: { mintRevoked: boolean; freezeRevoked: boolean; transferFeeBps: number; permanentDelegate: boolean; transferHook: boolean; metadataMutable: boolean | null };
+    liquidity?: { kind: string; lockedPct: number | null; quoteReserve: number | null; curveProgressPct: number | null };
+  };
   models: { specialist: string; judge: string; engine: string };
   attestation: { digest: string; concordiumTx: string | null; agentRegistry: string | null; signature?: { alg: string; publicKey: string; signature: string } };
   timing: { totalMs: number; agentsMs: number; judgeMs: number };

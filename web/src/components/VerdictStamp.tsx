@@ -7,6 +7,7 @@ import { WORD, isHot, normalise } from "@/lib/verdict";
 import { JudgeBrief } from "./JudgeBrief";
 import { FindingCards } from "./FindingCards";
 import { MoneyFlow } from "./MoneyFlow";
+import { ConnectionGraph } from "./ConnectionGraph";
 import { OutcomeChips } from "./Outcomes";
 import { VerifySignature } from "./VerifySignature";
 import { CopyButton } from "./CopyButton";
@@ -46,7 +47,9 @@ export function VerdictStamp({ verdict: raw, onRerun, onNew }: { verdict: Verdic
 
       <div className="mt-10"><JudgeBrief v={v} compact /></div>
 
-      <div className="mt-8"><FindingCards findings={v.findings} glass /></div>
+      <div className="mt-8"><ConnectionGraph v={v} /></div>
+
+      <div className="mt-4"><FindingCards findings={v.findings} glass evidence={v.evidence} /></div>
 
       <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-2 mono text-xs">
         <Stat k="top-10 holders" v={`${v.evidence.holders.top10Pct}%`} /><Stat k="snipers hold" v={`${v.evidence.snipers.holdingPct}%`} /><Stat k="bundled" v={`${v.evidence.bundles.boughtPct}% · ${v.evidence.bundles.groups} groups`} /><Stat k="linked wallets" v={`${v.evidence.linked.linkedPct}%`} />
