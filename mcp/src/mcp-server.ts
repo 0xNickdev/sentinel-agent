@@ -98,8 +98,10 @@ export function createMcpServer(o: McpOptions): McpServer {
 
   server.registerTool('sentinel_verdict', {
     title: 'Sentinel verdict',
-    description: `Is this Solana token a rug? Seven specialist agents (holders, snipers & bundles, funding graph, creator, contract & liquidity, market, money flow) analyse deterministic on-chain evidence and a judge issues SAFE / CAUTION / DANGER / RUGGED with a risk score, confidence, reasons and dissent. The verdict is hashed and anchored on Concordium (audit trail) and every agent carries a Verified by Concordium badge. Price: ${price}. Progress streams as notifications when you pass a progressToken.`,
-    inputSchema: { mint: z.string().describe('Solana token mint address (base58)'), fresh: z.boolean().optional().describe('Re-run even if a verdict from the last 5 minutes exists') },
+    description: `Is this Solana token a rug? Seven specialist agents (holders, snipers & bundles, funding graph, creator, contract & liquidity, market, money flow) analyse deterministic on-chain evidence and a judge issues SAFE / CAUTION / DANGER / RUGGED with a risk score, confidence, reasons and dissent. The verdict is hashed and anchored on Concordium (audit trail) and every agent carries a Verified by Concordium badge. Price: ${price}. Progress streams as notifications when you pass a progressToken. Pass idempotency_key so a retry is never charged twice, and max_price_ccd to cap the price. For a free one-second screen first, call sentinel_quick.`,
+    inputSchema: { mint: z.string().describe('Solana token mint address (base58)'), fresh: z.boolean().optional().describe('Re-run even if a verdict from the last 5 minutes exists'),
+      idempotency_key: z.string().optional().describe('8-128 chars, unique per decision. A retry with the same key returns the verdict already paid for and is not charged again (24 h, one mint per key).'),
+      max_price_ccd: z.number().optional().describe('Most you will pay, in CCD. Above it the call stops with price_above_max and nothing is charged.') },
     annotations: { readOnlyHint: true, openWorldHint: true },
   }, async ({ mint, fresh }, extra) => {
     if (!isMint(mint)) return { isError: true, content: [{ type: 'text', text: `not a Solana mint address: ${mint}` }] };

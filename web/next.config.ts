@@ -16,7 +16,11 @@ const nextConfig: NextConfig = {
     },
   },
   async rewrites() {
-    return [{ source: "/sentinel/:path*", destination: `${api}/:path*` }];
+    return [
+      { source: "/sentinel/:path*", destination: `${api}/:path*` },
+      // Agents look for /llms.txt at the site root; the API writes it so prices and URLs stay current.
+      { source: "/llms.txt", destination: `${api}/llms.txt` },
+    ];
   },
 };
 

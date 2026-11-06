@@ -7,13 +7,26 @@ const MCP_CONFIG = `{
   "mcpServers": {
     "sentinel": {
       "type": "http",
-      "url": "https://<sentinel-host>/mcp"
+      "url": "https://api.sentinelagent.pro/mcp"
     }
   }
 }`;
-const PROMPT = `Before trading any Solana token, call sentinel_verdict with its mint. Treat DANGER or RUGGED as a hard stop. Quote the risk score, the confidence and the top reason to the user, and link the audit record. Check sentinel_track once per session to know how well the judge has been calibrated lately.`;
+const PROMPT = `You have the Sentinel MCP server (https://api.sentinelagent.pro/mcp). Use it for every Solana token before money moves.
+1. Call sentinel_quick with the mint first. It is free and takes about a second. Its SAFE only means no authority, holder or liquidity rule fired; it never clears a trade on its own.
+2. Before any buy, or whenever sentinel_quick is not SAFE, call sentinel_verdict with an idempotency_key unique to this decision and max_price_ccd set to your budget. On a timeout, retry with the same key: you are not charged twice.
+3. Treat DANGER or RUGGED as a hard stop. Tell the user the verdict, the risk score, the confidence and the top reason, and link the audit record.
+4. Once per session, read sentinel_track and weigh Sentinel by its calibration (Brier and skill), not by its confidence.`;
+const SAFE_PAY = `POST /x402/verdict
+Idempotency-Key: trade-7f3a-0001        # unique per decision; a retry returns the verdict already paid for
+X-Max-Price-CCD: 2                      # or "max_price_ccd" in the body / MCP arguments
+{"mint":"<mint>"}
+
+→ 412 {"error":"price_above_max","price_ccd":…,"charged":false}   price above your ceiling, nothing paid
+→ 409 {"error":"…still running…","retry_after_seconds":10}         same key in flight, nothing paid
+→ 200 + idempotent-replay: true                                   the verdict you already paid for`;
 const TOOLS: Array<[string, string, string]> = [
-  ["sentinel_verdict", "{ mint, fresh? }", "Full swarm verdict: band, risk, confidence, headline, decisive fact, action, reasons, clean signals, what would change it, scorecard, advocate and rebuttal, vetoes, findings, consensus, flags, evidence incl. money flow, attestation (digest, Concordium tx, ML-DSA-65 signature). Paid over x402 when the server has a paywall. Streams progress notifications."],
+  ["sentinel_verdict", "{ mint, fresh?, idempotency_key?, max_price_ccd? }", "Full swarm verdict: band, risk, confidence, headline, decisive fact, action, reasons, clean signals, what would change it, scorecard, advocate and rebuttal, vetoes, findings, consensus, flags, evidence incl. money flow, attestation (digest, Concordium tx, ML-DSA-65 signature). Paid over x402 when the server has a paywall. Streams progress notifications."],
+  ["sentinel_quick", "{ mint }", "Free first look in about a second, no models: mint and freeze authority, Token-2022 extensions, holder concentration, liquidity and market shape, with what was and was not checked. A screen, not a clearance."],
   ["sentinel_agents", "{}", "The nine agents: roles, registry token ids, badge addresses, badge-check URLs, Agent Card URLs."],
   ["sentinel_check_badge", "{ id }", "Verify any Concordium agent badge or list an account's badges via the Agent Registry."],
   ["sentinel_audit", "{ digest? | mint? | limit? }", "Past verdicts with their on-chain audit records and outcomes."],
@@ -39,7 +52,8 @@ export default async function DocsPage() {
         <Doc id="mcp" title="01 · MCP">
           <p>Streamable HTTP, stateless. Add the server to Claude Desktop, Claude Code or any MCP client; discovery is free, verdicts are paid when a paywall is configured.</p>
           <Code title="mcp config" text={MCP_CONFIG} />
-          <Code title="agent prompt" text={PROMPT} />
+          <Code title="paste into your agent" text={PROMPT} />
+          <p>Agents that read before they call: <a className="text-fg underline" href="/llms.txt">/llms.txt</a> has the endpoints, the price, the paying rules and this prompt in one plain-text page.</p>
         </Doc>
 
         <Doc id="tools" title="02 · Tools">
@@ -57,6 +71,8 @@ export default async function DocsPage() {
             {[["MCP", "Claude, GPT, any MCP client", `tools/call sentinel_verdict · ${price}`], ["A2A", "agents speaking A2A v1.0", "SendMessage with a mint → Task with the verdict artifact"], ["HTTP", "bots and scripts", `POST /x402/verdict · ${price}`]].map(([n, who, how]) => <div key={n} className="rounded-2xl border border-line-2 p-4"><div className="display text-xl">{n}</div><div className="mt-1 text-sm text-fg-3">{who}</div><div className="mt-2 mono text-xs text-fg-2">{how}</div></div>)}
           </div>
           <Code title="plain HTTP" text={X402} />
+          <p>Two guards for agents that spend on their own: an idempotency key so a retry after a timeout is never charged twice, and a price ceiling so a price change never surprises the wallet. Both are checked before the 402, so a refused call costs nothing.</p>
+          <Code title="paying safely" text={SAFE_PAY} />
         </Doc>
 
         <Doc id="audit" title="05 · Audit trail">

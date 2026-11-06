@@ -10,7 +10,8 @@ import { secureHeaders } from 'hono/secure-headers';
 import { gatewayApp, paywall, type CreatorProofs, type PaywallOptions, type VerdictService, type Network } from '@sentinel/concordium';
 import { rateLimit } from './hardening.js';
 import { badgeExtension, mountA2A } from './a2a.js';
-import { agentDirectory, mountMcp, type McpOptions } from './mcp-server.js';
+import { agentDirectory, mountMcp, verdictView, type McpOptions } from './mcp-server.js';
+import { IdempotencyStore, llmsTxt, paidCallGuard } from './onboarding.js';
 
 export interface SentinelAppOptions {
   service: VerdictService;
@@ -25,6 +26,8 @@ export interface SentinelAppOptions {
   publicStream?: boolean;
   /** Concordium ID proofs for creator wallets; the /id routes answer 503 without it */
   creatorProofs?: CreatorProofs | null;
+  /** public site, linked from /llms.txt (default https://sentinelagent.pro) */
+  siteUrl?: string;
   log?: (m: string) => void;
 }
 
@@ -43,6 +46,12 @@ export function sentinelApp(o: SentinelAppOptions): Hono {
   app.use(bodyLimit({ maxSize: 256 * 1024, onError: c => c.json({ error: 'request body too large' }, 413) }));
   if (o.corsOrigins?.length) app.use(cors({ origin: o.corsOrigins, allowHeaders: ['content-type', 'accept', 'mcp-session-id', 'mcp-protocol-version', 'a2a-version', 'payment-signature'], exposeHeaders: ['payment-required', 'payment-response', 'mcp-session-id'], maxAge: 600 }));
   if (o.rateLimitPerMinute !== 0) app.use(rateLimit({ perMinute: o.rateLimitPerMinute ?? 60, skip: c => c.req.method === 'GET' && (c.req.path.startsWith('/.well-known/') || c.req.path === '/healthz') }));
+  // Paid doors: idempotent retries and a caller-set price ceiling, checked before the x402 gate so neither ever charges.
+  const guard = paidCallGuard({ service: o.service, store: new IdempotencyStore(), priceMicroCcd: o.paywall?.priceMicroCcd ?? null, view: v => verdictView(v, mcpOpts) });
+  app.use('/mcp', guard);
+  app.use('/x402/verdict', guard);
+  const llms = llmsTxt({ baseUrl: o.baseUrl, siteUrl: o.siteUrl ?? 'https://sentinelagent.pro', network: o.network, priceMicroCcd: o.paywall?.priceMicroCcd ?? null, payTo: o.paywall?.payTo ?? null });
+  app.get('/llms.txt', c => c.text(llms, 200, { 'cache-control': 'public, max-age=300' }));
   if (o.paywall) {
     // Pay per verdict, not per protocol message: only MCP tools/call sentinel_verdict goes through the x402 gate.
     const gate = paywall({ ...o.paywall, routes: ['POST /mcp'], description: 'Sentinel swarm verdict (MCP tools/call sentinel_verdict)' });

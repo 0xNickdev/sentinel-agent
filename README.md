@@ -14,7 +14,7 @@ Every verdict is sealed on Concordium before the outcome and graded after it.
 [![A2A](https://img.shields.io/badge/A2A-v1-555555?style=flat-square)](https://api.sentinelagent.pro/a2a)
 [![x402](https://img.shields.io/badge/x402-1_CCD%2Fverdict-555555?style=flat-square)](concordium/src/x402.ts)
 [![Signatures](https://img.shields.io/badge/signatures-ML--DSA--65-555555?style=flat-square)](https://api.sentinelagent.pro/.well-known/sentinel-keys.json)
-[![Tests](https://img.shields.io/badge/tests-86_passing-2ea043?style=flat-square)](#tests)
+[![Tests](https://img.shields.io/badge/tests-99_passing-2ea043?style=flat-square)](#tests)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6?style=flat-square)](tsconfig.base.json)
 [![Rust](https://img.shields.io/badge/contract-Rust-b7410e?style=flat-square)](concordium/audit-contract/src/lib.rs)
 [![License](https://img.shields.io/badge/license-MIT-lightgrey?style=flat-square)](LICENSE)
@@ -227,13 +227,15 @@ Only authorised submitters can write. Nothing can be updated or deleted. Each ho
 | Tool | Price | Returns |
 |---|---|---|
 | `sentinel_quick { mint }` | free | first look in about a second for fresh launches: authorities, extensions, holders, liquidity, market; engine rules, no models; says what it did not read · also `GET /quick/:mint` |
-| `sentinel_verdict { mint }` | 1 CCD over x402 | verdict, evidence, dissent, attestation; progress as notifications |
+| `sentinel_verdict { mint, idempotency_key?, max_price_ccd? }` | 1 CCD over x402 | verdict, evidence, dissent, attestation; progress as notifications |
 | `sentinel_track { limit? }` | free | Brier, skill, reliability, per-specialist scores, graded verdicts |
 | `sentinel_audit { digest? \| mint? }` | free | past verdicts with their Concordium records |
 | `sentinel_agents` | free | the nine agents, tokens and badges |
 | `sentinel_check_badge { id }` | free | badge status from the registry |
 
 **A2A**: `https://api.sentinelagent.pro/a2a` · **HTTP**: `POST https://api.sentinelagent.pro/x402/verdict { "mint": "…" }`
+
+Agents that spend on their own get two guards, both checked before the 402 so a refused call costs nothing. An `Idempotency-Key` header (or `idempotency_key` over MCP) makes a retry return the verdict already paid for. A `max_price_ccd` ceiling (body, MCP argument or `X-Max-Price-CCD` header) stops the call with `price_above_max` if the price is higher. Endpoints, prices, these rules and a ready agent prompt are at [`sentinelagent.pro/llms.txt`](https://sentinelagent.pro/llms.txt).
 
 An agent that asks before it buys:
 
@@ -284,9 +286,9 @@ Testnet setup, contract deployment and agent registration: [concordium/README.md
 | engine | 34 |
 | agents | 29 |
 | concordium | 20 |
-| mcp | 7 |
+| mcp | 12 |
 | audit contract (Rust) | 4 |
-| **total** | **94** |
+| **total** | **99** |
 
 ## Security
 
