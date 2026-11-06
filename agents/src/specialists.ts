@@ -49,6 +49,7 @@ const context = (snapshot: TokenSnapshot, evidence: Evidence) => ({
     'holders = the 20 largest token accounts grouped by owner, not the full holder list; holders.count is the number of distinct non-program owners among them, never the total holder count',
     'trades = balance changes in the oldest observed transactions of this mint (the launch window when the token is young; a recent slice for old, busy tokens), so sniper/bundle/market figures describe that window only',
     'aggregator figures (liquidityUsd, volume24hUsd, txns24h) are summed over every known pool, not one pool',
+    'every pct / *Pct field is already a percentage on a 0-100 scale: pct 0.43 means 0.43% of supply (not 43%), pct 43 means 43%. Never multiply by 100.',
   ],
 });
 
