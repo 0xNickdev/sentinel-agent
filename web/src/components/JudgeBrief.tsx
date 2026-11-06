@@ -4,7 +4,7 @@ import { WORD } from "@/lib/verdict";
 const WEIGHT: Record<string, string> = { decisive: "text-red", supporting: "text-fg", discounted: "text-fg-3", ignored: "text-fg-4" };
 
 /** The judge's brief: headline, decisive fact, action, the three reasons, what is clean, what would change it, the scorecard, advocate vs rebuttal. */
-export function JudgeBrief({ v, compact = false }: { v: Verdict; compact?: boolean }) {
+export function JudgeBrief({ v, compact = false, scorecard = true }: { v: Verdict; compact?: boolean; scorecard?: boolean }) {
   const rug = v.verdict === "DANGER" || v.verdict === "RUGGED";
   const structured = Boolean(v.headline || v.decisive || v.action);
   return (
@@ -32,7 +32,7 @@ export function JudgeBrief({ v, compact = false }: { v: Verdict; compact?: boole
         <div className="text-fg-2 leading-7 space-y-3">{v.reasoning.split(/\n\s*\n/).map((p, i) => <p key={i}>{p}</p>)}</div>
       )}
 
-      {v.scorecard.length > 0 && (
+      {scorecard && v.scorecard.length > 0 && (
         <div className="rounded-2xl border border-line-2 overflow-hidden">
           <div className="px-4 h-9 flex items-center mono text-xs text-fg-3 border-b border-line">SCORECARD · how much each agent counted</div>
           <div className="divide-y divide-line">

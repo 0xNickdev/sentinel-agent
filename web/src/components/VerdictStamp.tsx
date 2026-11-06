@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useEffect, useRef } from "react";
 import { animate } from "animejs";
-import { ccdscanTx, short, solscan, usd, type Verdict } from "@/lib/api";
+import { ccdscanTx, short, solscan, type Verdict } from "@/lib/api";
 import { WORD, isHot, normalise } from "@/lib/verdict";
 import { JudgeBrief } from "./JudgeBrief";
 import { FindingCards } from "./FindingCards";
@@ -45,16 +45,12 @@ export function VerdictStamp({ verdict: raw, onRerun, onNew }: { verdict: Verdic
         {(v.outcomes?.length ?? 0) > 0 && <div className="mt-3 flex justify-center"><OutcomeChips outcomes={v.outcomes!} riskScore={v.riskScore} /></div>}
       </div>
 
-      <div className="mt-10"><JudgeBrief v={v} compact /></div>
+      <div className="mt-10"><JudgeBrief v={v} compact scorecard={false} /></div>
 
-      <div className="mt-8"><ConnectionGraph v={v} /></div>
+      <div className="mt-8"><FindingCards v={v} glass /></div>
 
-      <div className="mt-4"><FindingCards findings={v.findings} glass evidence={v.evidence} /></div>
+      <div className="mt-4"><ConnectionGraph v={v} /></div>
 
-      <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-2 mono text-xs">
-        <Stat k="top-10 holders" v={`${v.evidence.holders.top10Pct}%`} /><Stat k="snipers hold" v={`${v.evidence.snipers.holdingPct}%`} /><Stat k="bundled" v={`${v.evidence.bundles.boughtPct}% · ${v.evidence.bundles.groups} groups`} /><Stat k="linked wallets" v={`${v.evidence.linked.linkedPct}%`} />
-        {m && <><Stat k="liquidity" v={usd(m.liquidityUsd)} /><Stat k="fdv" v={usd(m.fdvUsd)} /><Stat k="24h volume" v={usd(m.volume24hUsd)} /><Stat k="pools" v={`${m.pairs} · ${m.topVenue ?? "?"}`} /></>}
-      </div>
       {v.evidence.flows && v.evidence.flows.trails.length > 0 && <div className="mt-4"><MoneyFlow flows={v.evidence.flows} creator={v.evidence.creator?.address} limit={6} /></div>}
 
       <div className="mt-8 rounded-2xl border border-line-2 p-4 md:p-5 bg-black/60">
@@ -77,6 +73,3 @@ export function VerdictStamp({ verdict: raw, onRerun, onNew }: { verdict: Verdic
   );
 }
 
-function Stat({ k, v }: { k: string; v: string }) {
-  return <div className="rounded-xl border border-line p-3 bg-black/60"><div className="text-fg-4">{k}</div><div className="display-num text-lg text-fg mt-1">{v}</div></div>;
-}

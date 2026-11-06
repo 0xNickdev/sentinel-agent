@@ -39,7 +39,7 @@ export default async function AuditRecord({ params }: { params: Promise<{ digest
       </div>
       {v.vetoes.length > 0 && <div className="mt-3 flex flex-wrap gap-2">{v.vetoes.map(x => <span key={x.code} className="pill pill-red h-8 text-xs mono" title={x.message}>VETO · {x.code} · {x.agent}</span>)}</div>}
 
-      <div className="mt-10"><JudgeBrief v={v} /></div>
+      <div className="mt-10"><JudgeBrief v={v} scorecard={false} /></div>
 
       <Section title="OUTCOMES" copy="Graded at fixed horizons after the call. A rug is liquidity down more than 99%, no trades left, the labels of arXiv:2608.20271, or a pool under 1% of market cap. Each grade is written next to the record on Concordium and never edited.">
         <OutcomeTable outcomes={outcomes} riskScore={v.riskScore} />
@@ -77,8 +77,8 @@ export default async function AuditRecord({ params }: { params: Promise<{ digest
       </Section>
 
       <Section title="FINDINGS">
-        <ConnectionGraph v={v} />
-        <div className="mt-3"><FindingCards findings={v.findings} notable={4} cols="md:grid-cols-2" evidence={v.evidence} /></div>
+        <FindingCards v={v} />
+        <div className="mt-3"><ConnectionGraph v={v} /></div>
       </Section>
 
       <Section title="EVIDENCE">
