@@ -208,17 +208,17 @@ flowchart LR
 
 The Verify and Access protocol runs in-process with `@concordium/web-sdk` (no Docker verifier). Sentinel enforces the presentation context itself, including the binding to the anchor block, because web-sdk 12.0.2 skips that check. Stored: wallet, claim, time, the two anchors. Not stored: name, birth date, documents.
 
-### Fixed upstream
+### Bugs we found in Concordium's tooling
 
-Building on the registry, we reported three issues in Concordium's official [Agent Registry MCP](https://agent-registry-mcp.concordium.com/mcp). Concordium confirmed them and replied the same day:
+While integrating the Agent Registry, Sentinel hit two bugs in Concordium's official [Agent Registry MCP](https://agent-registry-mcp.concordium.com/mcp) that broke CIS-8 key registration and metadata reads on every network. We diagnosed both, worked around them by calling the contract directly, and reported them together with a third finding about wallet support. Concordium's engineers confirmed all three; the two bugs were fixed after our report and the fixes are live on the hosted MCP.
 
-| Issue | What was wrong | Status |
+| Finding | What was wrong | Outcome |
 |---|---|---|
 | `build_cis8_register` | targeted an entrypoint `register` that exists on no network; the CIS-8 module on testnet `<12801,0>` and mainnet `<10081,0>` exposes `registerExternalKey` | fixed in [PR #15](https://github.com/MarirosansP/concordium-agent-registry-mcp/pull/15); our binding [tx](https://testnet.ccdscan.io/transactions/1b41716219aa7fb7b458afcffc8c7a1a48ae5dea7f0449ef33a42ae6b06305c3) confirmed the parameter shape |
 | `get_metadata` | passed the token id as a number where the schema's `TokenIdU64` wants little-endian hex, so every read failed | fixed in the same PR |
 | Phantom and CIS-8 proofs | the `solana-ed25519` scheme signs raw canonical bytes; Phantom's `signMessage` refuses arbitrary bytes | a limit of the proof scheme, not the tool; a scheme wrapping the bytes in Solana's off-chain message format goes to the CIS-8 spec. Raw-byte signers (a programmatic ed25519 key, the Solana CLI) work today |
 
-Both fixes are live on the hosted MCP. Checked against it on 8 Nov 2026: `get_metadata { token_id: 982, key: "trackRecord", network: "testnet" }` returns the agent's on-chain track record (`24h n=1 brier=0.0784 …`), and `build_cis8_register` now emits `CIS-8.registerExternalKey` on `<12801,0>`.
+We re-checked the hosted MCP after the fix on 8 Nov 2026: `get_metadata { token_id: 982, key: "trackRecord", network: "testnet" }` returns the agent's on-chain track record (`24h n=1 brier=0.0784 …`), and `build_cis8_register` now emits `CIS-8.registerExternalKey` on `<12801,0>`.
 
 ### Contract interface
 
@@ -312,7 +312,7 @@ Prompt-injection guards treat every on-chain string as data. Inputs are validate
 - Static specialist weights stand in until enough graded verdicts exist to fit them from outcomes.
 - Creator proofs work end to end with the Concordium Wallet for Web. The Concordium ID App pairs and receives the request, but does not return a proof yet; we are working it through with Concordium.
 - A verified creator is accountable, not automatically honest; a creator planning a rug will not verify.
-- Phantom cannot sign CIS-8 proofs yet (see [Fixed upstream](#fixed-upstream)); bind a Solana key with the Solana CLI or a programmatic key.
+- Phantom cannot sign CIS-8 proofs yet (see [Bugs we found in Concordium's tooling](#bugs-we-found-in-concordiums-tooling)); bind a Solana key with the Solana CLI or a programmatic key.
 - Everything runs on Concordium testnet.
 
 ## Research
