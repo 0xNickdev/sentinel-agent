@@ -30,13 +30,25 @@ export class LaunchSampler {
   private day = '';
   private today = 0;
   private readonly judged = new Set<string>();
+  /** launches seen on the feed, kept until they are too old to sample; the service ring holds only the newest 50 (under a minute on pump.fun) */
+  private readonly seen = new Map<string, LaunchEvent>();
+  private watcher: NodeJS.Timeout | null = null;
 
   constructor(private readonly o: SamplerOptions) {}
 
   /** Launches eligible right now: old enough to have trades, young enough to be early, not judged before. */
+  /** Copy the newest launches into the pool and drop the ones past maxAge. Called every few seconds by start(). */
+  observe(now = this.o.now?.() ?? Math.floor(Date.now() / 1000)): void {
+    const max = this.o.maxAgeSec ?? 1800;
+    for (const l of this.o.service.launches(50)) if (!this.seen.has(l.mint)) this.seen.set(l.mint, l);
+    for (const [m, l] of this.seen) if (now - l.at > max) this.seen.delete(m);
+    while (this.seen.size > 20_000) { const k = this.seen.keys().next().value; if (k === undefined) break; this.seen.delete(k); }
+  }
+
   candidates(now = this.o.now?.() ?? Math.floor(Date.now() / 1000)): LaunchEvent[] {
     const min = this.o.minAgeSec ?? 300, max = this.o.maxAgeSec ?? 1800;
-    return this.o.service.launches(50).filter(l => now - l.at >= min && now - l.at <= max && !this.judged.has(l.mint) && !this.o.service.lookup({ mint: l.mint }));
+    this.observe(now);
+    return [...this.seen.values()].filter(l => now - l.at >= min && now - l.at <= max && !this.judged.has(l.mint) && !this.o.service.lookup({ mint: l.mint }));
   }
 
   /** One draw: a uniformly random eligible launch, judged once. Returns the mint judged, or null. */
@@ -47,7 +59,7 @@ export class LaunchSampler {
     if (day !== this.day) { this.day = day; this.today = 0; }
     if (this.today >= (this.o.perDay ?? 48)) return null;
     const pool = this.candidates(now);
-    if (!pool.length) return null;
+    if (!pool.length) { this.o.log?.(`sample · nothing eligible (${this.seen.size} launches seen in the last ${Math.round((this.o.maxAgeSec ?? 1800) / 60)} min)`); return null; }
     const pick = pool[Math.floor((this.o.random ?? Math.random)() * pool.length)]!;
     this.busy = true;
     this.judged.add(pick.mint);
@@ -67,7 +79,13 @@ export class LaunchSampler {
     const run = () => { void this.tick(); };
     this.timer = setInterval(run, this.o.everyMin * 60_000);
     this.timer.unref?.();
+    this.watcher = setInterval(() => this.observe(), 10_000);
+    this.watcher.unref?.();
   }
 
-  stop(): void { if (this.timer) clearInterval(this.timer); this.timer = null; }
+  stop(): void {
+    if (this.timer) clearInterval(this.timer);
+    if (this.watcher) clearInterval(this.watcher);
+    this.timer = this.watcher = null;
+  }
 }

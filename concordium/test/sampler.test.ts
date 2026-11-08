@@ -19,4 +19,20 @@ describe('launch sampler', () => {
     expect(await s.tick()).toBeNull();                                 // daily cap of 2 reached
     expect(judged).toHaveLength(2);
   });
+
+  it('keeps launches that already left the 50-slot ring, so a busy feed still yields 5-30 minute old candidates', () => {
+    const service = new VerdictService({ rpcUrl: 'http://127.0.0.1:1' });
+    let now = 1_800_000_000;
+    let ring: Array<{ mint: string; creator: string; name: string; symbol: string; signature: string; slot: number; at: number }> = [];
+    (service as unknown as { launches: () => unknown[] }).launches = () => ring;
+    const s = new LaunchSampler({ service, everyMin: 30, now: () => now });
+    for (let i = 0; i < 600; i++) {            // one launch a second for ten minutes; the ring keeps 50
+      ring = [{ mint: `M${String(i).padStart(31, '0')}`, creator: 'c', name: 'x', symbol: 'X', signature: 's', slot: i, at: now }, ...ring].slice(0, 50);
+      if (i % 10 === 0) s.observe(now);
+      now++;
+    }
+    expect(s.candidates(now).length).toBeGreaterThan(20);
+    now += 3600;
+    expect(s.candidates(now)).toHaveLength(0);  // everything aged out
+  });
 });
