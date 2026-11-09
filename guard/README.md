@@ -2,6 +2,8 @@
 
 One call between a Solana trading agent and a buy: **allow**, **warn** or **block**, with the reason and an on-chain audit link.
 
+[npm](https://www.npmjs.com/package/sentinelagent-guard) · [docs](https://sentinelagent.pro/docs) · [source](https://github.com/0xNickdev/sentinel-agent/tree/main/guard)
+
 ```bash
 npm install sentinelagent-guard
 ```

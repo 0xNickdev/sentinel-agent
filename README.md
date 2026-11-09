@@ -250,7 +250,7 @@ Only authorised submitters can write. Nothing can be updated or deleted. Each ho
 
 Agents that spend on their own get two guards, both checked before the 402 so a refused call costs nothing. An `Idempotency-Key` header (or `idempotency_key` over MCP) makes a retry return the verdict already paid for. A `max_price_ccd` ceiling (body, MCP argument or `X-Max-Price-CCD` header) stops the call with `price_above_max` if the price is higher. Endpoints, prices, these rules and a ready agent prompt are at [`sentinelagent.pro/llms.txt`](https://sentinelagent.pro/llms.txt).
 
-**Sentinel Guard** ([`guard/`](guard/README.md)) puts all of this behind one call for trading agents: it confirms Sentinel's badge with the Concordium Agent Registry, blocks on hard red flags for free, pays for the full verdict only when needed, and fails closed. It ships an ElizaOS action and a wrapper that stops an existing swap action from buying a blocked token.
+**Sentinel Guard** ([`guard/`](guard/README.md), on npm as [`sentinelagent-guard`](https://www.npmjs.com/package/sentinelagent-guard)) puts all of this behind one call for trading agents: it confirms Sentinel's badge with the Concordium Agent Registry, blocks on hard red flags for free, pays for the full verdict only when needed, and fails closed. It ships an ElizaOS action and a wrapper that stops an existing swap action from buying a blocked token.
 
 ```ts
 const guard = createGuard({ pay: concordiumPayer({ address, privateKeyHex }), maxPriceCcd: 2 });
@@ -284,7 +284,7 @@ flowchart LR
 | [`agents/`](agents/README.md) | Seven specialists, debate, anonymous council, advocate, structured judge, consensus with vetoes, ML-DSA-65 attestation, prompt-injection guards, CLI |
 | [`concordium/`](concordium/README.md) | Agent Registry client and cards, `sentinel_audit` contract (Rust) and client, resolver, launch sampler, x402 gateway and facilitator, demo agents |
 | [`mcp/`](mcp/README.md) | MCP server, A2A executor, hardened HTTP server (secure headers, body limit, CORS allowlist, rate limit) |
-| [`guard/`](guard/README.md) | Sentinel Guard: pre-trade allow/warn/block for trading agents, badge check, x402 payer, ElizaOS adapter, CLI |
+| [`guard/`](guard/README.md) | Sentinel Guard: pre-trade allow/warn/block for trading agents, badge check, x402 payer, ElizaOS adapter, CLI; [npm](https://www.npmjs.com/package/sentinelagent-guard) |
 | [`web/`](web) | Next.js site: live swarm over SSE, verdict stamp, audit explorer with in-browser signature verification, track record |
 
 ## Run it
