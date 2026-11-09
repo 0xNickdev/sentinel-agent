@@ -3,11 +3,11 @@
 // discovery (initialize, tools/list, sentinel_agents, badge checks) stays free.
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { Hono } from 'hono';
+import { Hono, type MiddlewareHandler } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { cors } from 'hono/cors';
 import { secureHeaders } from 'hono/secure-headers';
-import { gatewayApp, paywall, type CreatorProofs, type PaywallOptions, type VerdictService, type Network } from '@sentinel/concordium';
+import { gatewayApp, paywall, settledPayment, type CreatorProofs, type GuaranteeBook, type PaywallOptions, type VerdictService, type Network } from '@sentinel/concordium';
 import { rateLimit } from './hardening.js';
 import { badgeExtension, mountA2A } from './a2a.js';
 import { agentDirectory, mountMcp, verdictView, type McpOptions } from './mcp-server.js';
@@ -26,6 +26,8 @@ export interface SentinelAppOptions {
   publicStream?: boolean;
   /** Concordium ID proofs for creator wallets; the /id routes answer 503 without it */
   creatorProofs?: CreatorProofs | null;
+  /** the verdict guarantee; paid verdicts are recorded once their payment settles */
+  guarantee?: GuaranteeBook | null;
   /** public site, linked from /llms.txt (default https://sentinelagent.pro) */
   siteUrl?: string;
   log?: (m: string) => void;
@@ -52,6 +54,31 @@ export function sentinelApp(o: SentinelAppOptions): Hono {
   app.use('/x402/verdict', guard);
   const llms = llmsTxt({ baseUrl: o.baseUrl, siteUrl: o.siteUrl ?? 'https://sentinelagent.pro', network: o.network, priceMicroCcd: o.paywall?.priceMicroCcd ?? null, payTo: o.paywall?.payTo ?? null });
   app.get('/llms.txt', c => c.text(llms, 200, { 'cache-control': 'public, max-age=300' }));
+  // Guarantee receipts: after the x402 layer has settled (PAYMENT-RESPONSE carries payer and transaction), read the
+  // verdict digest from the answer and record who paid for it. Unsettled or replayed calls carry no receipt.
+  const book = o.guarantee ?? null;
+  if (book && o.paywall) {
+    const price = o.paywall.priceMicroCcd;
+    const recordPaid: MiddlewareHandler = async (c, next) => {
+      await next();
+      const paid = settledPayment(c.res.headers.get('payment-response'));
+      if (!paid) return;
+      // The MCP answer may be an SSE stream: read a clone in the background, never hold the response.
+      void c.res.clone().text().then(text => {
+        const digest = /"digest"\s*:\s*"([0-9a-f]{64})"/.exec(text)?.[1];
+        if (digest) book.record({ digest, payer: paid.payer, paymentTx: paid.transaction, amount: price, asset: 'CCD' });
+        else o.log?.(`guarantee · settled ${paid.transaction.slice(0, 8)} but no verdict digest in the answer`);
+      }).catch(e => o.log?.(`guarantee · receipt failed: ${e instanceof Error ? e.message : String(e)}`));
+    };
+    app.use('/mcp', recordPaid);
+    app.use('/x402/verdict', recordPaid);
+  }
+  app.get('/guarantee', c => (book ? c.json(book.report(Number(c.req.query('limit') ?? 50))) : c.json({ error: 'the guarantee needs the paywall' }, 404)));
+  app.get('/guarantee/:digest', c => {
+    if (!book) return c.json({ error: 'the guarantee needs the paywall' }, 404);
+    const d = c.req.param('digest');
+    return c.json({ digest: d, terms: book.terms, buyers: book.forDigest(d) ?? [] });
+  });
   if (o.paywall) {
     // Pay per verdict, not per protocol message: only MCP tools/call sentinel_verdict goes through the x402 gate.
     const gate = paywall({ ...o.paywall, routes: ['POST /mcp'], description: 'Sentinel swarm verdict (MCP tools/call sentinel_verdict)' });

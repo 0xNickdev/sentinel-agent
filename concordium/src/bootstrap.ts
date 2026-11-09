@@ -2,6 +2,7 @@
 // paywall, audit client, verdict service, demo snapshots. Everything is
 // optional so the server comes up in dev with nothing configured and gains
 // pieces as keys and deployments appear.
+import { GuaranteeBook } from './guarantee.js';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { serve } from '@hono/node-server';
@@ -33,6 +34,8 @@ export interface Bootstrap {
   sampler: LaunchSampler | null;
   /** Concordium ID proofs bound to creator wallets; null without a verifier account (the sponsor pays the anchors) */
   creatorProofs: CreatorProofs | null;
+  /** the verdict guarantee: refunds a paid SAFE that rugs; null without a paywall */
+  guarantee: GuaranteeBook | null;
   log: (m: string) => void;
 }
 
@@ -103,6 +106,14 @@ export function bootstrapFromEnv(root: string, log: (m: string) => void = m => c
     ? new LaunchSampler({ service, everyMin, perDay: Number(process.env.SENTINEL_SAMPLER_PER_DAY ?? 48), log })
     : null;
   log(sampler ? `sample · on: one launch every ${everyMin} min, at most ${process.env.SENTINEL_SAMPLER_PER_DAY ?? 48}/day` : 'sample · off (set SENTINEL_SAMPLER_EVERY_MIN to judge live launches for the track)');
+  // Guarantee: refunds come from CONCORDIUM_GUARANTEE (or the sponsor) and only for payments this server settled.
+  const pool = accountFromEnv('CONCORDIUM_GUARANTEE') ?? sponsor;
+  const guarantee = paywall
+    ? new GuaranteeBook({ network, pool, client: pool ? nodeClient(network, process.env.CONCORDIUM_NODE) : null, lookup: digest => service.lookup({ digest }), dataDir, log,
+        ...(process.env.SENTINEL_GUARANTEE_HORIZON_S ? { terms: { horizon: Number(process.env.SENTINEL_GUARANTEE_HORIZON_S) } } : {}) })
+    : null;
+  if (guarantee && resolver && !resolver.horizons.includes(guarantee.terms.horizon)) log(`guarantee · horizon ${guarantee.terms.horizon}s is not graded by the resolver; claims will never close`);
+  log(guarantee ? `guarantee · on: ${guarantee.terms.bands.join('/')} rugged by +${guarantee.terms.horizon}s is refunded from ${pool ? pool.address.toString() : 'nobody (read-only)'}` : 'guarantee · off (needs the paywall)');
   const corsOrigins = (process.env.SENTINEL_CORS_ORIGINS ?? 'http://localhost:3000,http://localhost:3100').split(',').map(s => s.trim()).filter(Boolean);
-  return { network, baseUrl, cardsDir, dataDir, service, paywall, facilitatorUrl, audit: Boolean(audit), corsOrigins, resolver, sampler, creatorProofs, log };
+  return { network, baseUrl, cardsDir, dataDir, service, paywall, facilitatorUrl, audit: Boolean(audit), corsOrigins, resolver, sampler, creatorProofs, guarantee, log };
 }

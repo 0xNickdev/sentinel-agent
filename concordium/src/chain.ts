@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import { credentials } from '@grpc/grpc-js';
 import {
   AccountAddress, AccountTransactionType, CcdAmount, ContractAddress, ContractName, Energy, ModuleReference, Parameter, ReceiveName,
-  TransactionExpiry, TransactionHash, buildAccountSigner, buildBasicAccountSigner, parseWallet, signTransaction, getTransactionRejectReason, affectedContracts,
+  TransactionExpiry, TransactionHash, DataBlob, buildAccountSigner, buildBasicAccountSigner, parseWallet, signTransaction, getTransactionRejectReason, affectedContracts,
   type AccountSigner, type AccountTransaction, type BlockItemSummaryInBlock,
 } from '@concordium/web-sdk';
 import { ConcordiumGRPCNodeClient } from '@concordium/web-sdk/nodejs';
@@ -61,6 +61,22 @@ async function send(client: ConcordiumGRPCNodeClient, network: Network, account:
   const reject = getTransactionRejectReason(result.summary);
   if (reject) throw new Error(`transaction ${hex} rejected: ${JSON.stringify(reject, (_, v) => (typeof v === 'bigint' ? v.toString() : v))}`);
   return { hash: hex, blockHash: result.blockHash.toString(), explorer: explorerTx(network, hex), summary: result.summary };
+}
+
+/** CBOR text string, the memo encoding wallets and explorers decode. Memos are capped at 256 bytes. */
+export function cborText(text: string): Buffer {
+  const b = Buffer.from(text, 'utf8');
+  const head = b.length < 24 ? Buffer.from([0x60 + b.length]) : b.length < 256 ? Buffer.from([0x78, b.length]) : Buffer.from([0x79, b.length >> 8, b.length & 0xff]);
+  const out = Buffer.concat([head, b]);
+  if (out.length > 256) throw new Error(`memo too long (${out.length} bytes)`);
+  return out;
+}
+
+const toArrayBuffer = (b: Buffer): ArrayBuffer => b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer;
+
+/** Plain CCD transfer with a text memo, waited to finalization. */
+export function transferCcd(client: ConcordiumGRPCNodeClient, network: Network, account: Account, to: string, microCcd: bigint, memo: string, log?: (m: string) => void) {
+  return send(client, network, account, AccountTransactionType.TransferWithMemo, { toAddress: AccountAddress.fromBase58(to), amount: CcdAmount.fromMicroCcd(microCcd), memo: new DataBlob(toArrayBuffer(cborText(memo))) }, log);
 }
 
 /** Call a contract entrypoint with an already-serialised parameter. */
