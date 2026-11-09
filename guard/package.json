@@ -1,18 +1,73 @@
 {
-  "name": "@sentinel/guard",
+  "name": "sentinelagent-guard",
   "version": "0.1.0",
   "description": "Pre-trade gate for Solana trading agents: allow, warn or block a buy on Sentinel's verdict, after checking Sentinel's Verified by Concordium badge",
+  "keywords": [
+    "elizaos",
+    "elizaos-plugin",
+    "solana",
+    "rug-pull",
+    "anti-rug",
+    "trading-agent",
+    "x402",
+    "concordium",
+    "mcp",
+    "ai-agent"
+  ],
+  "homepage": "https://sentinelagent.pro/docs",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/0xNickdev/sentinel-agent.git",
+    "directory": "guard"
+  },
+  "bugs": {
+    "url": "https://github.com/0xNickdev/sentinel-agent/issues"
+  },
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
-    ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
-    "./concordium": { "types": "./dist/concordium.d.ts", "default": "./dist/concordium.js" },
-    "./eliza": { "types": "./dist/eliza.d.ts", "default": "./dist/eliza.js" }
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./concordium": {
+      "types": "./dist/concordium.d.ts",
+      "default": "./dist/concordium.js"
+    },
+    "./eliza": {
+      "types": "./dist/eliza.d.ts",
+      "default": "./dist/eliza.js"
+    }
   },
-  "bin": { "sentinel-guard": "dist/cli.js" },
-  "files": ["dist", "README.md"],
+  "bin": {
+    "sentinel-guard": "dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "agentConfig": {
+    "pluginType": "elizaos:plugin:1.0.0",
+    "pluginParameters": {
+      "CONCORDIUM_PAYER_ADDRESS": {
+        "type": "string",
+        "description": "Concordium testnet account that pays for full verdicts over x402 (about 1 CCD each). Without a payer the guard uses the free screen only."
+      },
+      "CONCORDIUM_PAYER_KEY": {
+        "type": "string",
+        "description": "Private key (hex) of that account. Keep it in .env; it signs only the x402 payment."
+      }
+    }
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "vitest run",

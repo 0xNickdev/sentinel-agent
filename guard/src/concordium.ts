@@ -1,6 +1,6 @@
 // A paying fetch for the guard: x402 over Concordium with the `exact` scheme. The payment is a
 // sponsored transfer, so the agent needs CCD only for the price, never for fees.
-//   import { concordiumPayer } from '@sentinel/guard/concordium';
+//   import { concordiumPayer } from 'sentinelagent-guard/concordium';
 //   const guard = createGuard({ pay: concordiumPayer({ address, privateKeyHex }) });
 import { readFileSync } from 'node:fs';
 import { AccountAddress, buildAccountSigner, buildBasicAccountSigner, parseWallet } from '@concordium/web-sdk';

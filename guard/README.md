@@ -2,9 +2,13 @@
 
 One call between a Solana trading agent and a buy: **allow**, **warn** or **block**, with the reason and an on-chain audit link.
 
+```bash
+npm install sentinelagent-guard
+```
+
 ```ts
-import { createGuard } from '@sentinel/guard';
-import { concordiumPayer } from '@sentinel/guard/concordium';
+import { createGuard } from 'sentinelagent-guard';
+import { concordiumPayer } from 'sentinelagent-guard/concordium';
 
 const guard = createGuard({ pay: concordiumPayer({ address, privateKeyHex }), maxPriceCcd: 2 });
 
@@ -51,7 +55,7 @@ When the guard pays for a verdict that the gateway's guarantee covers, the decis
 ## ElizaOS
 
 ```ts
-import { sentinelGuardPlugin, guardAction } from '@sentinel/guard/eliza';
+import { sentinelGuardPlugin, guardAction } from 'sentinelagent-guard/eliza';
 
 // an action the agent can call: CHECK_TOKEN_RISK
 plugins: [sentinelGuardPlugin(guard)]
@@ -65,7 +69,7 @@ Typed structurally against `@elizaos/core` 1.x, so it adds no dependency on it.
 ## CLI
 
 ```bash
-sentinel-guard <mint> [--quick|--full] [--max-ccd 2] [--json]
+npx -p sentinelagent-guard sentinel-guard <mint> [--quick|--full] [--max-ccd 2] [--json]
 # exit 0 allow · 1 warn · 2 block; pays when CONCORDIUM_PAYER_WALLET (or _ADDRESS + _KEY) is set
 ```
 
