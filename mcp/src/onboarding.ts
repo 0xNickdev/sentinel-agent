@@ -127,6 +127,7 @@ export function llmsTxt(o: LlmsOptions): string {
 ## Paying safely
 - Send an Idempotency-Key header (or idempotency_key argument over MCP), 8-128 chars, unique per decision. A retry with the same key returns the verdict already paid for and is not charged again. The key is bound to one mint for 24 h.
 - Send max_price_ccd (body or MCP argument) or an X-Max-Price-CCD header. If the price is higher, the call stops with price_above_max and nothing is charged.
+- Guarantee: a paid SAFE verdict on a token that rugs within 24 h is refunded to the paying account automatically, as a CCD transfer whose memo names the verdict digest. Terms, the pool account and every claim: ${o.baseUrl}/guarantee
 - The paying agent needs CCD only for the price; the facilitator sponsors the transaction fee.
 
 ## Reading a verdict

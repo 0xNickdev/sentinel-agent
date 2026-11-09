@@ -165,6 +165,7 @@ Live: [sentinelagent.pro/track](https://sentinelagent.pro/track) · `GET https:/
 | **Agent Registry MCP** | the demo trader agent checks Sentinel's badge before paying | [`trader-agent.ts`](concordium/src/scripts/trader-agent.ts) |
 | **x402** | 1 CCD per verdict over HTTP and MCP, in-process facilitator | [`x402.ts`](concordium/src/x402.ts) |
 | **Sponsored transactions** | the facilitator pays the fee, the calling agent holds no gas | [`x402.ts`](concordium/src/x402.ts) |
+| **Verdict guarantee** | a paid SAFE that rugs within 24 h is refunded to the payer automatically: receipts are recorded only after x402 settles, the resolver's grade decides the claim, the refund is a CCD transfer whose memo names the verdict digest; terms and every claim at [`/guarantee`](https://api.sentinelagent.pro/guarantee) | [`guarantee.ts`](concordium/src/guarantee.ts) |
 | **Smart contract** | `sentinel_audit`: append-only verdict records and outcome grades | [`lib.rs`](concordium/audit-contract/src/lib.rs) |
 | **Concordium ID · Verify and Access** | token creators bind their Solana wallet to a zero-knowledge proof (18+); request and audit record anchored (CCDVRA, CCDVAA), nothing personal stored | [`idproof.ts`](concordium/src/idproof.ts), [sentinelagent.pro/verify](https://sentinelagent.pro/verify) |
 | **CIS-8 External Key Registry** | Sentinel's Solana key is bound to the verified owner; the gateway agent's external reference points at it, so a Solana-side caller resolves key → agent → person | [`cis8-bind.ts`](concordium/src/scripts/cis8-bind.ts), [`link-agent-key.ts`](concordium/src/scripts/link-agent-key.ts) |
@@ -249,6 +250,13 @@ Only authorised submitters can write. Nothing can be updated or deleted. Each ho
 
 Agents that spend on their own get two guards, both checked before the 402 so a refused call costs nothing. An `Idempotency-Key` header (or `idempotency_key` over MCP) makes a retry return the verdict already paid for. A `max_price_ccd` ceiling (body, MCP argument or `X-Max-Price-CCD` header) stops the call with `price_above_max` if the price is higher. Endpoints, prices, these rules and a ready agent prompt are at [`sentinelagent.pro/llms.txt`](https://sentinelagent.pro/llms.txt).
 
+**Sentinel Guard** ([`guard/`](guard/README.md)) puts all of this behind one call for trading agents: it confirms Sentinel's badge with the Concordium Agent Registry, blocks on hard red flags for free, pays for the full verdict only when needed, and fails closed. It ships an ElizaOS action and a wrapper that stops an existing swap action from buying a blocked token.
+
+```ts
+const guard = createGuard({ pay: concordiumPayer({ address, privateKeyHex }), maxPriceCcd: 2 });
+const d = await guard.check(mint);   // allow | warn | block, with the reason and the audit link
+```
+
 An agent that asks before it buys:
 
 ```bash
@@ -276,6 +284,7 @@ flowchart LR
 | [`agents/`](agents/README.md) | Seven specialists, debate, anonymous council, advocate, structured judge, consensus with vetoes, ML-DSA-65 attestation, prompt-injection guards, CLI |
 | [`concordium/`](concordium/README.md) | Agent Registry client and cards, `sentinel_audit` contract (Rust) and client, resolver, launch sampler, x402 gateway and facilitator, demo agents |
 | [`mcp/`](mcp/README.md) | MCP server, A2A executor, hardened HTTP server (secure headers, body limit, CORS allowlist, rate limit) |
+| [`guard/`](guard/README.md) | Sentinel Guard: pre-trade allow/warn/block for trading agents, badge check, x402 payer, ElizaOS adapter, CLI |
 | [`web/`](web) | Next.js site: live swarm over SSE, verdict stamp, audit explorer with in-browser signature verification, track record |
 
 ## Run it
@@ -313,6 +322,7 @@ Prompt-injection guards treat every on-chain string as data. Inputs are validate
 - Creator proofs work end to end with the Concordium Wallet for Web. The Concordium ID App pairs and receives the request, but does not return a proof yet; we are working it through with Concordium.
 - A verified creator is accountable, not automatically honest; a creator planning a rug will not verify.
 - Phantom cannot sign CIS-8 proofs yet (see [Bugs we found in Concordium's tooling](#bugs-we-found-in-concordiums-tooling)); bind a Solana key with the Solana CLI or a programmatic key.
+- The guarantee pool is an ordinary account Sentinel funds, not escrow: Protocol-Level Locks, which would hold it on-chain, are not on testnet yet. Refunds are in CCD; PLT stablecoin payments (USDR is live on testnet) need test USDR, which has no public faucet.
 - Everything runs on Concordium testnet.
 
 ## Research
