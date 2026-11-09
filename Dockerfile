@@ -7,6 +7,7 @@ COPY engine/package.json engine/
 COPY agents/package.json agents/
 COPY concordium/package.json concordium/
 COPY mcp/package.json mcp/
+COPY guard/package.json guard/
 COPY web/package.json web/
 RUN npm ci -w @sentinel/engine -w @sentinel/agents -w @sentinel/concordium -w @sentinel/mcp --include-workspace-root --no-audit --no-fund
 # The lockfile is made on macOS; add the Linux x64 napi binary of the Yellowstone gRPC client (launch feed).

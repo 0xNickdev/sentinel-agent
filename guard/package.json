@@ -1,0 +1,31 @@
+{
+  "name": "@sentinel/guard",
+  "version": "0.1.0",
+  "description": "Pre-trade gate for Solana trading agents: allow, warn or block a buy on Sentinel's verdict, after checking Sentinel's Verified by Concordium badge",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
+    "./concordium": { "types": "./dist/concordium.d.ts", "default": "./dist/concordium.js" },
+    "./eliza": { "types": "./dist/eliza.d.ts", "default": "./dist/eliza.js" }
+  },
+  "bin": { "sentinel-guard": "dist/cli.js" },
+  "files": ["dist", "README.md"],
+  "license": "MIT",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "lint": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@concordium/web-sdk": "^12.0.2",
+    "@x402/concordium": "^2.29.0",
+    "@x402/fetch": "^2.29.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0",
+    "vitest": "^5.0.5"
+  }
+}
