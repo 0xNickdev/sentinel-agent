@@ -14,6 +14,8 @@ export interface VerdictServiceOptions {
   rpcUrl: string;
   /** a second RPC tried when the first refuses (401/403/429): keeps verdicts flowing when a provider key runs out */
   fallbackRpcUrl?: string | null;
+  /** pause before the primary RPC is tried again when the fallback fails too (rate limits clear in seconds); default 20 s */
+  rpcRetryMs?: number;
   llm?: LLM;
   audit?: { client: AuditClient; submitter: Account; agentIds: number[]; network: Network } | null;
   /** directory for verdicts.jsonl and snapshot cache; memory-only when omitted */
@@ -162,7 +164,15 @@ export class VerdictService {
       const msg = e instanceof Error ? e.message : String(e);
       if (!this.fallback || !/\b(401|403|429)\b|Forbidden|Unauthorized|Too Many/i.test(msg)) throw e;
       this.o.log?.(`engine · primary rpc refused (${msg.slice(0, 60)}); retrying on the fallback rpc`);
-      s = await this.fallback.snapshot(mint);
+      try { s = await this.fallback.snapshot(mint); }
+      catch (e2) {
+        // The fallback may refuse a call the primary serves (Shyft blocks getTokenLargestAccounts on large mints), and a
+        // rate limit clears in seconds: wait, then give the primary one more try before the verdict fails.
+        const wait = this.o.rpcRetryMs ?? 20_000;
+        this.o.log?.(`engine · fallback rpc failed (${(e2 instanceof Error ? e2.message : String(e2)).slice(0, 60)}); retrying the primary in ${Math.round(wait / 1000)} s`);
+        await new Promise(r => setTimeout(r, wait));
+        s = await this.adapter.snapshot(mint);
+      }
     }
     this.snapshots.set(mint, s);
     return s;
