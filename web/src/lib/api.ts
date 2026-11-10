@@ -61,7 +61,7 @@ export interface QuickVerdict { tier: "fast"; mint: string; verdict: "SAFE" | "C
 export interface AgentInfo { key: string; name: string; role: string; tokenId: number | null; badge: string | null; badgeCheck: string | null; card: string; cardTx?: string | null; trackRecordTx?: string | null }
 /** Sentinel's Solana ed25519 key bound to the owner's Concordium account in the CIS-8 External Key Registry. */
 export interface Cis8Binding { network: string; contract: { index: number; subindex: number }; owner: string; externalKey: { namespace: string; key_type: string; public_key_hex: string }; registerTx: string; explorer: string; agentLinks?: Record<string, string> }
-export interface AgentsResponse { network: string; agents: AgentInfo[]; price: { microCcd: string; payTo: string } | null; attestation: { alg: string; publicKey: string }; cis8?: Cis8Binding | null }
+export interface AgentsResponse { network: string; agents: AgentInfo[]; price: { microCcd: string; payTo: string; plt?: { asset: string; amount: string; payTo: string } | null } | null; attestation: { alg: string; publicKey: string }; cis8?: Cis8Binding | null }
 
 export type SwarmEvent =
   | { type: "swarm_start"; mint: string; agents: Array<{ id: string; name: string }>; flags: number; baselineScore: number }

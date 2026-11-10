@@ -75,6 +75,8 @@ npx -p sentinelagent-guard sentinel-guard <mint> [--quick|--full] [--max-ccd 2] 
 # exit 0 allow · 1 warn · 2 block; pays when CONCORDIUM_PAYER_WALLET (or _ADDRESS + _KEY) is set
 ```
 
+Sentinel prices a verdict at 1 CCD or 0.01 EUDemo, Concordium's allow-listed test PLT. Set `CONCORDIUM_PAYER_ASSET=EUDemo` to pay in EUDemo; the account must be on the EUDemo allow list (the [faucet](https://allowlist.testnet.concordium.com) lists it after an EU-nationality proof). In code: `concordiumPayer({ network, address, privateKeyHex, asset: 'EUDemo' })`. A guarantee refund comes back in the asset you paid.
+
 On testnet, 9 Nov 2026:
 
 ```

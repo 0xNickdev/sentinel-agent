@@ -1,6 +1,6 @@
 {
   "name": "sentinelagent-guard",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Pre-trade gate for Solana trading agents: allow, warn or block a buy on Sentinel's verdict, after checking Sentinel's Verified by Concordium badge",
   "keywords": [
     "elizaos",

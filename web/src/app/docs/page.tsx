@@ -38,7 +38,7 @@ const SECTIONS = ["01 MCP", "02 Tools", "03 A2A", "04 x402", "05 Audit", "06 Tra
 
 export default async function DocsPage() {
   const a = await fetch(`${serverApi()}/api/agents`, { cache: "no-store" }).then(r => (r.ok ? (r.json() as Promise<AgentsResponse>) : null)).catch(() => null);
-  const price = a?.price ? `${Number(a.price.microCcd) / 1e6} CCD` : "1 CCD";
+  const price = (a?.price ? `${Number(a.price.microCcd) / 1e6} CCD` : "1 CCD") + (a?.price?.plt ? ` or ${Number(a.price.plt.amount) / 1e6} ${a.price.plt.asset}` : "");
   const payTo = a?.price?.payTo ?? "<owner account>";
   const X402 = `POST /x402/verdict  {"mint":"<mint>"}\n→ 402 · PAYMENT-REQUIRED: base64({ "x402Version": 2, "accepts": [{ "scheme": "exact", "network": "ccd:testnet",\n     "amount": "${a?.price?.microCcd ?? "1000000"}", "asset": "CCD", "payTo": "${payTo.slice(0, 12)}…", "extra": { "feePayer": "<sponsor>" } }] })\nPOST /x402/verdict + PAYMENT-SIGNATURE: base64({ signedTransaction, sender })\n→ 200 · PAYMENT-RESPONSE: base64({ success, transaction }) · verdict JSON`;
   return (
@@ -73,7 +73,7 @@ export default async function DocsPage() {
           <Code title="plain HTTP" text={X402} />
           <p>Two guards for agents that spend on their own: an idempotency key so a retry after a timeout is never charged twice, and a price ceiling so a price change never surprises the wallet. Both are checked before the 402, so a refused call costs nothing.</p>
           <Code title="paying safely" text={SAFE_PAY} />
-          <p><span className="text-fg">Guarantee.</span> A paid SAFE verdict on a token that rugs within 24 hours is refunded to the paying account, automatically. The receipt is recorded only after the x402 payment settles, the resolver&apos;s 24 h grade decides the claim, and the refund is a CCD transfer whose memo names the verdict digest, so anyone can match it on CCDScan. Terms, the pool account and every claim: <a className="text-fg underline" href="https://api.sentinelagent.pro/guarantee">/guarantee</a>.</p>
+          <p><span className="text-fg">Guarantee.</span> A paid SAFE verdict on a token that rugs within 24 hours is refunded to the paying account, automatically. The receipt is recorded only after the x402 payment settles, the resolver&apos;s 24 h grade decides the claim, and the refund goes back in the asset paid (CCD, or EUDemo as a PLT transfer) with a memo naming the verdict digest, so anyone can match it on CCDScan. The first one paid out on 9 Nov 2026: a SAFE on PAYDAY was drained within a day and 1 CCD went back automatically. Terms, the pool account and every claim: <a className="text-fg underline" href="https://api.sentinelagent.pro/guarantee">/guarantee</a>.</p>
           <p><span className="text-fg">Sentinel Guard.</span> For trading agents, <span className="mono">sentinelagent-guard</span> wraps all of this in one call that returns allow, warn or block: it checks Sentinel&apos;s badge with the Concordium registry, blocks hard red flags for free, pays only when needed and fails closed. It ships an ElizaOS action and a wrapper that stops an existing swap from buying a blocked token. <a className="text-fg underline" href="https://github.com/0xNickdev/sentinel-agent/tree/main/guard">guard/</a></p>
         </Doc>
 
