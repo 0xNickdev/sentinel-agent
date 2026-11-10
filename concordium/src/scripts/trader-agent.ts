@@ -41,7 +41,7 @@ if (!mint) {
 
 // 3. Pay for the verdict. The first call answers 402 with the price; the x402 client signs a CCD transfer and retries.
 const t0 = Date.now();
-const res = await payingFetch(network, payer)(`${gateway}/x402/verdict`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ mint }) });
+const res = await payingFetch(network, payer, { asset: process.env.X402_PAY_ASSET || null })(`${gateway}/x402/verdict`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ mint }) });
 if (!res.ok) { say(`verdict request failed: HTTP ${res.status} ${await res.text()}`); process.exit(1); }
 const receipt = res.headers.get('PAYMENT-RESPONSE');
 const settled = receipt ? decodePaymentResponseHeader(receipt) as { transaction?: string } : null;

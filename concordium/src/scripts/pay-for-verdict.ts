@@ -18,7 +18,7 @@ const probe = await fetch(`${gateway}/x402/verdict`, { method: 'POST', headers: 
 console.error(`without payment: HTTP ${probe.status}${probe.status === 402 ? ' Payment Required' : ''}`);
 
 const t0 = Date.now();
-const res = await payingFetch(network, payer)(`${gateway}/x402/verdict`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ mint }) });
+const res = await payingFetch(network, payer, { asset: process.env.X402_PAY_ASSET || null })(`${gateway}/x402/verdict`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ mint }) });
 console.error(`with payment: HTTP ${res.status} in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
 const receipt = res.headers.get('PAYMENT-RESPONSE');
 if (receipt) {

@@ -48,12 +48,27 @@ export interface PaywallOptions {
   /** route patterns, e.g. "POST /x402/verdict" */
   routes: string[];
   description?: string;
+  /**
+   * A second price in a protocol-level token, offered next to CCD (e.g. EUDemo, the allow-listed EU test stablecoin).
+   * `amount` is in the token's smallest unit. `payTo` must be on the token's allow list when it has one; it is the
+   * guarantee pool, so a refund leaves from the account that took the payment.
+   */
+  plt?: { asset: string; amount: string; payTo: string } | null;
+}
+
+/** `X402_PRICE_PLT=EUDemo:10000` → { asset: 'EUDemo', amount: '10000' } (0.01 EUDemo at 6 decimals). */
+export function parsePltPrice(v: string | undefined | null): { asset: string; amount: string } | null {
+  const m = /^\s*([A-Za-z0-9._-]{1,128})\s*:\s*(\d+)\s*$/.exec(v ?? '');
+  return m && BigInt(m[2]!) > 0n ? { asset: m[1]!, amount: m[2]! } : null;
 }
 
 export function paywall(o: PaywallOptions) {
   const server = new x402ResourceServer(new HTTPFacilitatorClient({ url: o.facilitatorUrl })).register(caip2(o.network), new ExactConcordiumServer());
   const routes = Object.fromEntries(o.routes.map(r => [r, {
-    accepts: [{ scheme: 'exact', network: caip2(o.network), payTo: o.payTo, price: { amount: o.priceMicroCcd, asset: 'CCD' } }],
+    accepts: [
+      { scheme: 'exact', network: caip2(o.network), payTo: o.payTo, price: { amount: o.priceMicroCcd, asset: 'CCD' } },
+      ...(o.plt ? [{ scheme: 'exact', network: caip2(o.network), payTo: o.plt.payTo, price: { amount: o.plt.amount, asset: o.plt.asset } }] : []),
+    ],
     description: o.description ?? 'Sentinel swarm verdict',
     mimeType: 'application/json',
   }]));
@@ -61,10 +76,15 @@ export function paywall(o: PaywallOptions) {
 }
 
 // ── Paying client: any agent that holds CCD on testnet ───────────────────
-export function payingFetch(network: Network, payer: Account): typeof fetch {
-  // CCD is not one of x402's default (USD-stable) assets, so allow it explicitly for the paying agent.
+/** Put the offers in `asset` first, so a gateway that prices in CCD and a PLT is paid in the one the agent holds. */
+export const preferAsset = (asset: string | null | undefined) => <R extends { asset: string }>(_v: number, reqs: R[]): R[] =>
+  asset ? [...reqs.filter(r => r.asset === asset), ...reqs.filter(r => r.asset !== asset)] : reqs;
+
+export function payingFetch(network: Network, payer: Account, opts: { asset?: string | null } = {}): typeof fetch {
+  // CCD and EUDemo are not among x402's default (USD-stable) assets, so allow them explicitly for the paying agent.
   return wrapFetchWithPaymentFromConfig(fetch, {
     schemes: [{ network: caip2(network), client: new ExactConcordiumClient({ accountAddress: payer.address, signer: payer.signer }, { grpcUrl: `${GRPC_HOST[network]}:20000`, useTls: true }) }],
+    policies: [preferAsset(opts.asset)],
     spendControls: { allowedAssets: true },
   } as Parameters<typeof wrapFetchWithPaymentFromConfig>[1]) as typeof fetch;
 }

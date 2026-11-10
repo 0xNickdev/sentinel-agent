@@ -12,7 +12,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ConcordiumGRPCNodeClient } from '@concordium/web-sdk/nodejs';
 import { AccountAddress } from '@concordium/web-sdk';
-import { explorerTx, transferCcd, type Account } from './chain.js';
+import { explorerTx, transferCcd, transferPlt, type Account } from './chain.js';
 import type { Network } from './registry.js';
 import type { StoredVerdict } from './service.js';
 
@@ -50,7 +50,7 @@ export interface GuaranteeOptions {
   log?: (m: string) => void;
   now?: () => number;
   /** injected in tests */
-  transfer?: (to: string, amount: bigint, memo: string) => Promise<{ hash: string }>;
+  transfer?: (to: string, amount: bigint, memo: string, asset: string) => Promise<{ hash: string }>;
 }
 
 const DIGEST = /^[0-9a-f]{64}$/;
@@ -118,12 +118,15 @@ export class GuaranteeBook {
           continue;
         }
         const amount = (BigInt(r.amount) * BigInt(Math.round(this.terms.share * 1000))) / 1000n;
-        if (r.asset !== 'CCD') { this.close({ ...base, status: 'failed', refundTx: null, amount: amount.toString(), reason: `refunds in ${r.asset} are not enabled yet` }, made); continue; }
         if (!this.o.transfer && !(this.o.pool && this.o.client)) { this.close({ ...base, status: 'failed', refundTx: null, amount: amount.toString(), reason: 'no refund pool configured' }, made); continue; }
         // Memo names the verdict, so anyone can match a refund on the explorer to the call it answers.
         const memo = `sentinel refund ${r.digest}`;
         try {
-          const tx = this.o.transfer ? await this.o.transfer(r.payer, amount, memo) : await transferCcd(this.o.client!, this.o.network, this.o.pool!, r.payer, amount, memo);
+          // Refunded in the asset that was paid: CCD, or the PLT (EUDemo) the payer used. A PLT with an allow list
+          // needs the pool on it, which it is when it took the payment.
+          const tx = this.o.transfer ? await this.o.transfer(r.payer, amount, memo, r.asset)
+            : r.asset === 'CCD' ? await transferCcd(this.o.client!, this.o.network, this.o.pool!, r.payer, amount, memo)
+            : await transferPlt(this.o.client!, this.o.network, this.o.pool!, r.asset, r.payer, amount, memo);
           this.close({ ...base, status: 'refunded', refundTx: tx.hash, amount: amount.toString(), reason: `SAFE, rugged by +${this.terms.horizon}s: ${outcome.labels.join(', ') || 'rug'}` }, made);
         } catch (e) {
           this.close({ ...base, status: 'failed', refundTx: null, amount: amount.toString(), reason: `refund failed, retried next tick: ${e instanceof Error ? e.message : String(e)}` }, made);
@@ -143,6 +146,8 @@ export class GuaranteeBook {
     this.o.log?.(`guarantee · ${c.status} ${c.digest.slice(0, 8)}${c.refundTx ? ` · ${explorerTx(this.o.network, c.refundTx)}` : ''} · ${c.reason}`);
   }
 
+  private assetOf(c: Closure) { return this.receipts.get(c.paymentTx)?.asset ?? 'CCD'; }
+
   report(limit = 50) {
     const rows = [...this.receipts.values()].sort((a, b) => b.at - a.at);
     const closed = [...this.closures.values()];
@@ -156,7 +161,9 @@ export class GuaranteeBook {
         open: rows.filter(r => !this.closures.has(r.paymentTx) || this.closures.get(r.paymentTx)!.status === 'failed').length,
         kept: closed.filter(c => c.status === 'kept').length,
         refunded: refunded.length,
-        refundedAmount: refunded.reduce((s, c) => s + BigInt(c.amount), 0n).toString(),
+        // CCD in microCCD, kept as before; a PLT refund is counted per asset next to it, never added to CCD.
+        refundedAmount: refunded.filter(c => this.assetOf(c) === 'CCD').reduce((s, c) => s + BigInt(c.amount), 0n).toString(),
+        refundedByAsset: Object.fromEntries([...new Set(refunded.map(c => this.assetOf(c)))].map(a => [a, refunded.filter(c => this.assetOf(c) === a).reduce((s, c) => s + BigInt(c.amount), 0n).toString()])),
       },
       receipts: rows.slice(0, limit).map(r => ({ ...r, closure: this.closures.get(r.paymentTx) ?? null })),
     };
@@ -179,6 +186,19 @@ export class GuaranteeBook {
 }
 
 /** x402 PAYMENT-RESPONSE header → settled payer and transaction, or null. */
+/**
+ * What the payer accepted, from the request's PAYMENT-SIGNATURE header (x402 v2 carries the chosen requirements):
+ * the asset and the amount in its smallest unit. Null when absent or unreadable.
+ */
+export function acceptedPayment(header: string | null | undefined): { asset: string; amount: string; payTo: string | null } | null {
+  if (!header) return null;
+  try {
+    const p = JSON.parse(Buffer.from(header, 'base64').toString('utf8')) as { accepted?: { asset?: string; amount?: string; maxAmountRequired?: string; payTo?: string } };
+    const a = p.accepted, amount = a?.amount ?? a?.maxAmountRequired;
+    return a?.asset && amount && /^\d+$/.test(amount) ? { asset: a.asset, amount, payTo: a.payTo ?? null } : null;
+  } catch { return null; }
+}
+
 export function settledPayment(header: string | null | undefined): { payer: string; transaction: string } | null {
   if (!header) return null;
   try {

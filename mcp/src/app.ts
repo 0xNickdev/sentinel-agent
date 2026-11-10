@@ -7,7 +7,7 @@ import { Hono, type MiddlewareHandler } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { cors } from 'hono/cors';
 import { secureHeaders } from 'hono/secure-headers';
-import { gatewayApp, paywall, settledPayment, type CreatorProofs, type GuaranteeBook, type PaywallOptions, type VerdictService, type Network } from '@sentinel/concordium';
+import { acceptedPayment, gatewayApp, paywall, settledPayment, type CreatorProofs, type GuaranteeBook, type PaywallOptions, type VerdictService, type Network } from '@sentinel/concordium';
 import { rateLimit } from './hardening.js';
 import { badgeExtension, mountA2A } from './a2a.js';
 import { agentDirectory, mountMcp, verdictView, type McpOptions } from './mcp-server.js';
@@ -66,7 +66,9 @@ export function sentinelApp(o: SentinelAppOptions): Hono {
       // The MCP answer may be an SSE stream: read a clone in the background, never hold the response.
       void c.res.clone().text().then(text => {
         const digest = /"digest"\s*:\s*"([0-9a-f]{64})"/.exec(text)?.[1];
-        if (digest) book.record({ digest, payer: paid.payer, paymentTx: paid.transaction, amount: price, asset: 'CCD' });
+        // The payer chose CCD or the PLT price; the PAYMENT-SIGNATURE header says which, so the refund matches it.
+        const acc = acceptedPayment(c.req.header('payment-signature'));
+        if (digest) book.record({ digest, payer: paid.payer, paymentTx: paid.transaction, amount: acc?.amount ?? price, asset: acc?.asset ?? 'CCD' });
         else o.log?.(`guarantee · settled ${paid.transaction.slice(0, 8)} but no verdict digest in the answer`);
       }).catch(e => o.log?.(`guarantee · receipt failed: ${e instanceof Error ? e.message : String(e)}`));
     };
@@ -90,7 +92,7 @@ export function sentinelApp(o: SentinelAppOptions): Hono {
     });
   }
   // REST twin of the sentinel_agents tool for the showcase site.
-  app.get('/api/agents', c => c.json({ network: o.network, agents: agentDirectory(mcpOpts), price: o.paywall ? { microCcd: o.paywall.priceMicroCcd, payTo: o.paywall.payTo } : null, attestation: { alg: 'ML-DSA-65', publicKey: o.service.keys.publicKeyHex }, cis8 }));
+  app.get('/api/agents', c => c.json({ network: o.network, agents: agentDirectory(mcpOpts), price: o.paywall ? { microCcd: o.paywall.priceMicroCcd, payTo: o.paywall.payTo, ...(o.paywall.plt ? { plt: o.paywall.plt } : {}) } : null, attestation: { alg: 'ML-DSA-65', publicKey: o.service.keys.publicKeyHex }, cis8 }));
   // Fast tier: engine rules only, no models, free and rate limited like every unpaid route.
   app.get('/quick/:mint', async c => {
     const mint = c.req.param('mint');

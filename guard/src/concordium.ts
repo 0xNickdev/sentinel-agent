@@ -17,6 +17,8 @@ export interface PayerOptions {
   /** … or an account address with its hex signing key */
   address?: string;
   privateKeyHex?: string;
+  /** pay in this asset when the gateway offers it, e.g. 'EUDemo' (an allow-listed PLT: the account must be on its list); CCD otherwise */
+  asset?: string | null;
 }
 
 export function concordiumPayer(o: PayerOptions): typeof fetch {
@@ -32,14 +34,17 @@ export function concordiumPayer(o: PayerOptions): typeof fetch {
   // CCD is not one of x402's default USD-stable assets, so the paying agent allows it explicitly.
   return wrapFetchWithPaymentFromConfig(fetch, {
     schemes: [{ network: caip2, client: new ExactConcordiumScheme({ accountAddress: address, signer }, { grpcUrl: GRPC[network], useTls: true }) }],
+    // Offers in the preferred asset first; the first offer is the one paid.
+    policies: [<R extends { asset: string }>(_v: number, reqs: R[]): R[] => (o.asset ? [...reqs.filter(r => r.asset === o.asset), ...reqs.filter(r => r.asset !== o.asset)] : reqs)],
     spendControls: { allowedAssets: true },
   } as Parameters<typeof wrapFetchWithPaymentFromConfig>[1]) as typeof fetch;
 }
 
-/** `<PREFIX>_WALLET`, or `<PREFIX>_ADDRESS` + `<PREFIX>_KEY`; null when neither is set. */
+/** `<PREFIX>_WALLET`, or `<PREFIX>_ADDRESS` + `<PREFIX>_KEY`, optional `<PREFIX>_ASSET`; null when neither is set. */
 export function concordiumPayerFromEnv(prefix = 'CONCORDIUM_PAYER', network: 'testnet' | 'mainnet' = 'testnet'): typeof fetch | null {
   const walletFile = process.env[`${prefix}_WALLET`], address = process.env[`${prefix}_ADDRESS`], privateKeyHex = process.env[`${prefix}_KEY`];
-  if (walletFile) return concordiumPayer({ network, walletFile });
-  if (address && privateKeyHex) return concordiumPayer({ network, address, privateKeyHex });
+  const asset = process.env[`${prefix}_ASSET`] || null;
+  if (walletFile) return concordiumPayer({ network, walletFile, asset });
+  if (address && privateKeyHex) return concordiumPayer({ network, address, privateKeyHex, asset });
   return null;
 }

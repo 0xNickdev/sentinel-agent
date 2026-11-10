@@ -14,7 +14,7 @@ const [mint, url = process.env.SENTINEL_MCP_URL ?? 'http://localhost:4020/mcp'] 
 if (!mint) { console.error('usage: mcp-client-demo <mint> [mcpUrl]'); process.exit(1); }
 const network = (process.env.CONCORDIUM_NETWORK ?? 'testnet') as Network;
 const payer = accountFromEnv('CONCORDIUM_PAYER');
-const f = payer ? payingFetch(network, payer) : fetch;
+const f = payer ? payingFetch(network, payer, { asset: process.env.X402_PAY_ASSET || null }) : fetch;
 console.error(payer ? `paying as ${payer.address.toString()} (x402 on ${network})` : 'no payer wallet: calling unpaid');
 
 const client = new Client({ name: 'demo-trading-agent', version: '0.1.0' }, { capabilities: {} });

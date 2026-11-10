@@ -10,6 +10,7 @@ import {
   type AccountSigner, type AccountTransaction, type BlockItemSummaryInBlock,
 } from '@concordium/web-sdk';
 import { ConcordiumGRPCNodeClient } from '@concordium/web-sdk/nodejs';
+import { CborMemo, Token, TokenAmount, TokenId } from '@concordium/web-sdk/plt';
 import type { Network } from './registry.js';
 
 export const GRPC: Record<Network, { host: string; port: number }> = {
@@ -111,4 +112,21 @@ export async function initContract(client: ConcordiumGRPCNodeClient, network: Ne
   const [addr] = affectedContracts(r.summary);
   if (!addr) throw new Error(`init ${r.hash}: no contract address in summary`);
   return { ...r, address: { index: Number(addr.index), subindex: Number(addr.subindex) } };
+}
+
+/**
+ * Protocol-level token (PLT) transfer with a text memo, waited to finalization. `amount` is in the token's smallest
+ * unit. Validated against the chain first, so an allow-list or balance problem fails here with a readable error
+ * instead of as a rejected transaction.
+ */
+export async function transferPlt(client: ConcordiumGRPCNodeClient, network: Network, account: Account, tokenId: string, to: string, amount: bigint, memo: string, log?: (m: string) => void): Promise<TxResult> {
+  const token = await Token.fromId(client, TokenId.fromString(tokenId));
+  const hash = await Token.transfer(token, account.address, { recipient: AccountAddress.fromBase58(to), amount: TokenAmount.create(amount, token.info.state.decimals), memo: CborMemo.fromString(memo) }, account.signer, undefined, { autoScale: false, validate: true });
+  const hex = TransactionHash.toHexString(hash);
+  log?.(`sent ${tokenId} transfer ${hex}, waiting for finalization`);
+  const result = await client.waitForTransactionFinalization(hash, 120_000);
+  if (!result.summary) throw new Error(`transaction ${hex}: node returned a summary this SDK cannot decode`);
+  const reject = getTransactionRejectReason(result.summary);
+  if (reject) throw new Error(`transaction ${hex} rejected: ${JSON.stringify(reject, (_, v) => (typeof v === 'bigint' ? v.toString() : v))}`);
+  return { hash: hex, blockHash: result.blockHash.toString(), explorer: explorerTx(network, hex), summary: result.summary };
 }

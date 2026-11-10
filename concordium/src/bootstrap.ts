@@ -15,7 +15,7 @@ import { accountFromEnv, nodeClient } from './chain.js';
 import type { Network } from './registry.js';
 import { VerdictService } from './service.js';
 import { CreatorProofs } from './idproof.js';
-import { facilitatorApp, type PaywallOptions } from './x402.js';
+import { facilitatorApp, parsePltPrice, type PaywallOptions } from './x402.js';
 
 export interface Bootstrap {
   network: Network;
@@ -56,10 +56,18 @@ export function bootstrapFromEnv(root: string, log: (m: string) => void = m => c
     log(`facilitator · ${facilitatorUrl} · sponsor ${sponsor.address.toString()}`);
   }
   const payTo = process.env.CONCORDIUM_PAY_TO || accountFromEnv('CONCORDIUM_OWNER')?.address.toString() || null;
+  // The guarantee pool also takes the PLT price, so it can refund in the token that was paid (an allow-listed PLT
+  // needs both ends on the list; the owner key never leaves the owner's machine, so the owner cannot be that end).
+  const pool = accountFromEnv('CONCORDIUM_GUARANTEE') ?? sponsor;
+  const pltPrice = parsePltPrice(process.env.X402_PRICE_PLT);
+  if (process.env.X402_PRICE_PLT && !pltPrice) log(`paywall · X402_PRICE_PLT is not <tokenId>:<amount>, ignored`);
+  if (pltPrice && !pool) log('paywall · X402_PRICE_PLT needs CONCORDIUM_GUARANTEE or CONCORDIUM_SPONSOR to receive it, ignored');
   const paywall: PaywallOptions | null = facilitatorUrl && payTo
-    ? { network, payTo, facilitatorUrl, priceMicroCcd: process.env.X402_PRICE_MICROCCD ?? '1000000', routes: ['POST /x402/verdict'] }
+    ? { network, payTo, facilitatorUrl, priceMicroCcd: process.env.X402_PRICE_MICROCCD ?? '1000000', routes: ['POST /x402/verdict'],
+        plt: pltPrice && pool ? { ...pltPrice, payTo: pool.address.toString() } : null }
     : null;
   if (!paywall) log('paywall · off (set CONCORDIUM_SPONSOR_WALLET or X402_FACILITATOR_URL, plus CONCORDIUM_PAY_TO or CONCORDIUM_OWNER_WALLET)');
+  else if (paywall.plt) log(`paywall · also priced in ${paywall.plt.asset}: ${paywall.plt.amount} (smallest unit) to ${paywall.plt.payTo}`);
 
   // Audit: needs the deployed contract address and the submitter key.
   const auditFile = join(cardsDir, 'audit-contract.json');
@@ -106,8 +114,7 @@ export function bootstrapFromEnv(root: string, log: (m: string) => void = m => c
     ? new LaunchSampler({ service, everyMin, perDay: Number(process.env.SENTINEL_SAMPLER_PER_DAY ?? 48), log })
     : null;
   log(sampler ? `sample · on: one launch every ${everyMin} min, at most ${process.env.SENTINEL_SAMPLER_PER_DAY ?? 48}/day` : 'sample · off (set SENTINEL_SAMPLER_EVERY_MIN to judge live launches for the track)');
-  // Guarantee: refunds come from CONCORDIUM_GUARANTEE (or the sponsor) and only for payments this server settled.
-  const pool = accountFromEnv('CONCORDIUM_GUARANTEE') ?? sponsor;
+  // Guarantee: refunds come from the pool above (CONCORDIUM_GUARANTEE or the sponsor), only for payments this server settled.
   const guarantee = paywall
     ? new GuaranteeBook({ network, pool, client: pool ? nodeClient(network, process.env.CONCORDIUM_NODE) : null, lookup: digest => service.lookup({ digest }), dataDir, log,
         ...(process.env.SENTINEL_GUARANTEE_HORIZON_S ? { terms: { horizon: Number(process.env.SENTINEL_GUARANTEE_HORIZON_S) } } : {}) })
