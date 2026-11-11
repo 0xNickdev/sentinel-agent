@@ -10,3 +10,4 @@ coverage/
 target/
 concordium/keys/
 *.export
+.vercel

@@ -101,7 +101,7 @@ flowchart LR
 
 Facts are code, judgement is the model. The engine computes every number from Solana mainnet with deterministic, tested code. Each specialist sees one evidence domain and returns a typed finding with a risk score, a confidence and the evidence it used.
 
-| Agent | Reads | Weight | Can veto | Token |
+| Agent | Reads | Prior weight | Can veto | Token |
 |---|---|---:|---|---:|
 | Contract & Liquidity | mint and freeze authority, Token-2022 extensions, LP lock | 1.20 | mint or freeze authority live, permanent delegate, pullable LP | 987 |
 | Funding Graph | who funded the top wallets, shared funders, exchange hot wallets | 1.15 | | 985 |
@@ -120,6 +120,8 @@ xychart-beta
     y-axis "weight" 0 --> 1.4
     bar [1.20, 1.15, 1.10, 1.00, 1.00, 0.95, 0.80]
 ```
+
+The prior is only where a weight starts. Once 30 verdicts have been graded at the 24 h horizon, each specialist's weight is its prior moved by how its sealed scores turned out: `weight = prior × exp(−2 · (Brier − swarm mean Brier)) ^ (n / (n + 50))`, the multiplier bounded to 0.25–2.5. This is the exponentially weighted forecaster from prediction with expert advice; the loss is taken relative to the swarm's mean so the base rate cannot move the weights by itself, and the exponent keeps a thin history from deciding much. A weight only ever sees outcomes graded before the verdict it is used on. Every verdict records which weights it used (`findings[].weight`, `consensus.weights`), and the current ones are on [/track](https://sentinelagent.pro/track) and in `GET /track`. Code: [`scoring.ts`](engine/src/scoring.ts), [`track.ts`](concordium/src/track.ts).
 
 ### Consensus rule
 
@@ -149,8 +151,12 @@ A verdict's `riskScore / 100` is its forecast that the token rugs. The resolver 
 |---|---|
 | `tvl_rug` | liquidity fell more than 99 % since the verdict |
 | `idle` | no trades in the last 24 h (from the 24 h horizon on) |
-| `drained` | a pool under 1 % of the market cap |
+| `drained` | an AMM pool under 1 % of the market cap |
+| `curve_empty` | a bonding curve that traded and holds under $100 of buyers' SOL |
+| `delisted` | listed when judged, dropped by the aggregator since |
 | `price_collapse` + `creator_exit` | the creator left and the price went with them |
+
+On a bonding curve the aggregator reports no pool, so liquidity there is the SOL buyers have put in, read from the curve price (`real SOL = 30 × (√(price / launch price) − 1)` on pump.fun). The first labelling rule did not do this: it read almost every priced curve token as `drained` and a token the aggregator had dropped as alive, which inflated the 1 h rug rate and deflated the 24 h one. Grades now carry the rule they were made under. The 142 one-hour and 102 one-day grades made under rule 1 stay on chain and stay listed, and the scores are computed from rule 2 grades only.
 
 Scores are strictly proper: Brier and log score reward honest probabilities, not confident ones. Skill is measured against the base rate, because a flat "90 % rug" guess already scores well on launchpad tokens. A **launch sampler** judges random live pump.fun launches on a fixed clock, so the track is not built only from tokens people chose to ask about.
 
@@ -318,7 +324,8 @@ Prompt-injection guards treat every on-chain string as data. Inputs are validate
 ## Honest limits
 
 - The badge proves that a verified person is accountable for the agents. It does not prove that a verdict is right; the track record is how you judge that.
-- Static specialist weights stand in until enough graded verdicts exist to fit them from outcomes.
+- A verdict below CAUTION needs observation: a token nobody has traded, or one still on its bonding curve and under a day old, cannot be called SAFE, whatever the specialists found or did not find. The sampler therefore spends half its draws on survivors, tokens it judged before that were graded alive and still trade, so the track holds calls with both outcomes.
+- Weights learned from the track move the swarm's mean toward the specialists that have been right; they do not make that mean a calibrated probability. The sampler judges launches minutes old, nearly all of which are dead within days, and a specialist that finds nothing in its own domain still scores the token low. A calibration map fitted on rule 2 grades is the next step.
 - Creator proofs work end to end with the Concordium Wallet for Web. The Concordium ID App pairs and receives the request, but does not return a proof yet; we are working it through with Concordium.
 - A verified creator is accountable, not automatically honest; a creator planning a rug will not verify.
 - Phantom cannot sign CIS-8 proofs yet (see [Bugs we found in Concordium's tooling](#bugs-we-found-in-concordiums-tooling)); bind a Solana key with the Solana CLI or a programmatic key.

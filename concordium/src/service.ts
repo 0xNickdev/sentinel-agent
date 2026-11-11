@@ -3,12 +3,13 @@
 // Streams swarm events to whoever is listening for the request.
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { AnthropicLLM, CONSENSUS, detectVetoes, judgeToken, keysFromEnv, scoreToBand, signVerdict, type AttestationKeys, type LLM, type SwarmEvent, type Verdict } from '@sentinel/agents';
+import { AnthropicLLM, CONSENSUS, detectVetoes, judgeToken, keysFromEnv, scoreToBand, signVerdict, type AttestationKeys, type LLM, type SwarmEvent, type SwarmOptions, type Verdict } from '@sentinel/agents';
 import { SolanaAdapter, analyze, type CreatorProof, type LaunchEvent, type LaunchFeed, type Outcome, type TokenSnapshot } from '@sentinel/engine';
 import type { AuditClient } from './audit.js';
 import type { Account } from './chain.js';
 import { explorerTx } from './chain.js';
 import type { Network } from './registry.js';
+import { learnedWeights } from './track.js';
 
 export interface VerdictServiceOptions {
   rpcUrl: string;
@@ -58,11 +59,14 @@ export interface StoredVerdict extends Verdict {
   outcomes?: StoredOutcome[];
 }
 
+const SNAPSHOT_TTL_S = 600;
+
 const MINT_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 export const isMint = (s: string) => MINT_RE.test(s);
 
 export class VerdictService {
   private readonly snapshots = new Map<string, TokenSnapshot>();
+  private readonly seeded = new Set<string>();
   private readonly byDigest = new Map<string, StoredVerdict>();
   private readonly byMint = new Map<string, StoredVerdict>();
   private readonly adapter: SolanaAdapter;
@@ -151,11 +155,12 @@ export class VerdictService {
   onLaunch(l: (ev: LaunchEvent) => void): () => void { this.launchListeners.add(l); return () => this.launchListeners.delete(l); }
 
   /** Pre-seed a snapshot (demo cache, tests). */
-  seed(snapshot: TokenSnapshot) { this.snapshots.set(snapshot.mint, snapshot); }
+  seed(snapshot: TokenSnapshot) { this.snapshots.set(snapshot.mint, snapshot); this.seeded.add(snapshot.mint); }
 
+  /** Chain data for a mint. A read is reused for ten minutes; after that the token is read again, so a second verdict on the same token sees what happened since the first. Seeded snapshots never expire. */
   async snapshot(mint: string): Promise<TokenSnapshot> {
     const cached = this.snapshots.get(mint);
-    if (cached) return cached;
+    if (cached && (this.seeded.has(mint) || Date.now() / 1000 - cached.at < SNAPSHOT_TTL_S)) return cached;
     let s: TokenSnapshot;
     try {
       s = await this.adapter.snapshot(mint);
@@ -186,7 +191,7 @@ export class VerdictService {
     // A proof can arrive after the snapshot was cached, so it is looked up per verdict, never cached with the chain data.
     const proof = this.o.creatorProofs?.get(base.creator) ?? null;
     const snapshot = proof ? { ...base, creatorProof: { wallet: proof.wallet, claims: proof.claims, verifiedAt: proof.verifiedAt, requestTx: proof.requestTx, auditTx: proof.auditTx } } : base;
-    const v = await judgeToken(snapshot, { llm: this.llm, ...(this.o.audit ? { registry: Object.fromEntries(this.o.audit.agentIds.map((id, i) => [['holders', 'snipers', 'funding', 'creator', 'contract', 'market', 'judge'][i] ?? `agent${i}`, String(id)])) } : {}) }, onEvent);
+    const v = await judgeToken(snapshot, { llm: this.llm, ...this.trackWeights(), ...(this.o.audit ? { registry: Object.fromEntries(this.o.audit.agentIds.map((id, i) => [['holders', 'snipers', 'funding', 'creator', 'contract', 'market', 'judge'][i] ?? `agent${i}`, String(id)])) } : {}) }, onEvent);
     let auditSeq: number | null = null, auditExplorer: string | null = null;
     if (this.o.audit) {
       try {
@@ -212,6 +217,13 @@ export class VerdictService {
 
   /** Every stored verdict, newest first. */
   all(): StoredVerdict[] { return [...this.byDigest.values()].sort((a, b) => b.stored.at - a.stored.at); }
+
+  /** Reliability weights for the next verdict, learned from the graded track; SENTINEL_TRACK_WEIGHTS=0 keeps the static priors. */
+  private trackWeights(): Pick<SwarmOptions, 'weights'> {
+    if (process.env.SENTINEL_TRACK_WEIGHTS === '0') return {};
+    const { byAgent, source } = learnedWeights(this.all());
+    return source.source === 'track' ? { weights: { byAgent, source } } : {};
+  }
 
   /** Attach an outcome grade to a verdict (one per horizon) and persist it. Returns false when the digest is unknown or the horizon is already graded. */
   attachOutcome(digest: string, outcome: StoredOutcome, persist = true): boolean {

@@ -1,6 +1,6 @@
 import { analyze } from '@sentinel/engine';
 import { describe, expect, it } from 'vitest';
-import { CONSENSUS, aggregate, dataCompleteness, detectVetoes, effectiveWeight, pickDebaters, reconcile, rugEvidence, scoreToBand } from '../src/consensus.js';
+import { CONSENSUS, aggregate, dataCompleteness, detectVetoes, effectiveWeight, observation, pickDebaters, reconcile, rugEvidence, scoreToBand } from '../src/consensus.js';
 import { councilBrief, councilScores, decodeRanking } from '../src/council.js';
 import { cleanToken, rugToken } from '../src/fixtures.js';
 import type { AgentFinding, AgentId, JudgeOutput } from '../src/schema.js';
@@ -117,6 +117,33 @@ describe('reconcile', () => {
     expect(up.verdict).toBe('DANGER');
     const down = reconcile(judge({ verdict: 'SAFE', riskScore: 5 }), c, [], e);
     expect(down.riskScore).toBe(Math.round(c.weightedScore - CONSENSUS.judgeLatitude));
+  });
+  it('SAFE needs observation: a launch nobody has traded, or a curve token under a day old, floors at CAUTION', () => {
+    const at = 1_700_000_000;
+    const seasoned = analyze(cleanToken());
+    expect(observation(seasoned, at)).toEqual({ sufficient: true, missing: [] });
+    const young = cleanToken(); young.market = { ...young.market!, oldestPairAt: at - 900 };
+    const unpriced = cleanToken(); unpriced.market = { ...unpriced.market!, priceUsd: null, txns24h: 0, oldestPairAt: at - 900 };
+    const unlisted = cleanToken(); unlisted.market = null;
+    const graduated = cleanToken(); graduated.market = { ...graduated.market!, onCurve: false, oldestPairAt: at - 900 };
+    expect(observation(analyze(young), at).missing).toEqual(['still on its bonding curve and 0.3 h old: under 24 h of history']);
+    expect(observation(analyze(unpriced), at).missing).toHaveLength(2);
+    expect(observation(analyze(unlisted), at).sufficient).toBe(false);
+    expect(observation(analyze(graduated), at).sufficient).toBe(true);
+
+    const e = analyze(young), obs = observation(e, at);
+    const quiet = [finding('contract', 5), finding('funding', 8), finding('holders', 12)];
+    const c = aggregate(quiet, e, [], { debateRounds: 0, debated: [], failed: [], observation: obs });
+    expect(c.weightedScore).toBeLessThan(CONSENSUS.cautionFrom);
+    expect(c.suggestedBand).toBe('CAUTION');
+    const r = reconcile(judge({ verdict: 'SAFE', riskScore: 20 }), c, [], e);
+    expect(r).toMatchObject({ verdict: 'CAUTION', riskScore: CONSENSUS.cautionFrom });
+    expect(r.overridden.join(' ')).toContain('not enough observation for SAFE');
+    // the same findings on a token with a day of history may be called SAFE
+    const c2 = aggregate(quiet, seasoned, [], { debateRounds: 0, debated: [], failed: [], observation: observation(seasoned, at) });
+    expect(reconcile(judge({ verdict: 'SAFE', riskScore: 20 }), c2, [], seasoned).verdict).toBe('SAFE');
+    // a higher call is left alone
+    expect(reconcile(judge({ verdict: 'CAUTION', riskScore: 28 }), c, [], e).riskScore).toBe(CONSENSUS.cautionFrom);
   });
   it('drained liquidity is a veto owned by the market agent', () => {
     const s = cleanToken();

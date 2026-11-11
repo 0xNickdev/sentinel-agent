@@ -165,8 +165,23 @@ export class GuaranteeBook {
         refundedAmount: refunded.filter(c => this.assetOf(c) === 'CCD').reduce((s, c) => s + BigInt(c.amount), 0n).toString(),
         refundedByAsset: Object.fromEntries([...new Set(refunded.map(c => this.assetOf(c)))].map(a => [a, refunded.filter(c => this.assetOf(c) === a).reduce((s, c) => s + BigInt(c.amount), 0n).toString()])),
       },
+      // The oracle's own account of being wrong: what it was paid, what it gave back, and what it still stands to lose.
+      book: this.book(rows),
       receipts: rows.slice(0, limit).map(r => ({ ...r, closure: this.closures.get(r.paymentTx) ?? null })),
     };
+  }
+
+  /** Per asset, in its smallest unit: revenue from every paid verdict, refunds paid out, the net, and the covered payments not yet decided. */
+  private book(rows: Receipt[]): Record<string, { revenue: string; refunded: string; net: string; atRisk: string; paid: number; refunds: number }> {
+    const out: Record<string, { revenue: bigint; refunded: bigint; atRisk: bigint; paid: number; refunds: number }> = {};
+    for (const r of rows) {
+      const b = (out[r.asset] ??= { revenue: 0n, refunded: 0n, atRisk: 0n, paid: 0, refunds: 0 });
+      const c = this.closures.get(r.paymentTx);
+      b.revenue += BigInt(r.amount); b.paid++;
+      if (c?.status === 'refunded') { b.refunded += BigInt(c.amount); b.refunds++; }
+      else if (c?.status !== 'kept' && this.terms.bands.includes(r.verdict)) b.atRisk += (BigInt(r.amount) * BigInt(Math.round(this.terms.share * 1000))) / 1000n;
+    }
+    return Object.fromEntries(Object.entries(out).map(([a, b]) => [a, { revenue: b.revenue.toString(), refunded: b.refunded.toString(), net: (b.revenue - b.refunded).toString(), atRisk: b.atRisk.toString(), paid: b.paid, refunds: b.refunds }]));
   }
 
   /** What one verdict's buyers can claim; null when nobody paid for it. */

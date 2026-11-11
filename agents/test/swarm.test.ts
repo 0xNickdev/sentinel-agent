@@ -180,4 +180,19 @@ describe('runSwarm', () => {
     expect(starts).toEqual(['contract']);
     expect(r.value.findings).toHaveLength(1);
   });
+
+  it('uses the weights learned from the track when given them, and records where they came from', async () => {
+    const scores = { holders: 10, snipers: 10, funding: 10, creator: 10, contract: 10, market: 40, flows: 10 };
+    const run = (weights?: Parameters<typeof judgeToken>[1]['weights']) => judgeToken(cleanToken(), { llm: fakeLLM(scores, { verdict: 'SAFE', riskScore: 20 }), models, effort, advocate: false, council: false, ...(weights ? { weights } : {}) });
+    const plain = await run();
+    expect(plain.consensus.weights).toEqual({ source: 'static' });
+    expect(plain.findings.find(f => f.agent === 'market')!.weight).toBe(0.8);
+    const source = { source: 'track' as const, horizon: 86_400, rule: 2, graded: 120 };
+    const learned = await run({ byAgent: { market: 2, contract: 0.4 }, source });
+    expect(learned.consensus.weights).toEqual(source);
+    expect(learned.findings.find(f => f.agent === 'market')!.weight).toBe(2);
+    expect(learned.findings.find(f => f.agent === 'contract')!.weight).toBe(0.4);
+    expect(learned.findings.find(f => f.agent === 'holders')!.weight).toBe(0.95);   // not named: the prior stands
+    expect(learned.consensus.weightedScore).toBeGreaterThan(plain.consensus.weightedScore);
+  });
 });

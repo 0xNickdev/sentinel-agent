@@ -4,10 +4,17 @@
 // fixed clock, a few minutes after they appear (so there is trading to read),
 // with no filter on how they look. Those verdicts are sealed and later graded
 // like any other, which gives the track an unbiased stream of calls.
+//
+// Launches alone teach the track little: nearly all of them are dead within a
+// day, so every call has the same outcome. Half the draws therefore go to
+// survivors: tokens Sentinel judged before whose last grade found them alive
+// and which still trade. They are judged again, as a new sealed verdict, on an
+// older token with a real history. The choice looks only at what is visible
+// when the draw is made, never at how the token turns out.
 // Every run costs model tokens, so it is off unless SENTINEL_SAMPLER_EVERY_MIN
 // is set, and a daily cap bounds the spend.
-import type { LaunchEvent } from '@sentinel/engine';
-import type { VerdictService } from './service.js';
+import { fetchMarket, type LaunchEvent, type MarketData } from '@sentinel/engine';
+import type { StoredVerdict, VerdictService } from './service.js';
 
 export interface SamplerOptions {
   service: VerdictService;
@@ -19,6 +26,13 @@ export interface SamplerOptions {
   maxAgeSec?: number;
   /** hard cap on sampled verdicts per UTC day (default 48) */
   perDay?: number;
+  /** share of draws that go to survivors when there are any (default 0.5; 0 turns re-judging off) */
+  survivorShare?: number;
+  /** a survivor is judged again only this long after its last verdict (default 1 h) */
+  survivorMinGapSec?: number;
+  /** verdicts one token can collect in total (default 3) */
+  maxVerdictsPerMint?: number;
+  fetchMarket?: (mint: string) => Promise<MarketData | null>;
   random?: () => number;
   now?: () => number;
   log?: (m: string) => void;
@@ -33,6 +47,8 @@ export class LaunchSampler {
   /** launches seen on the feed, kept until they are too old to sample; the service ring holds only the newest 50 (under a minute on pump.fun) */
   private readonly seen = new Map<string, LaunchEvent>();
   private watcher: NodeJS.Timeout | null = null;
+  /** survivors found dead at a draw; not looked at again */
+  private readonly gone = new Set<string>();
 
   constructor(private readonly o: SamplerOptions) {}
 
@@ -51,16 +67,61 @@ export class LaunchSampler {
     return [...this.seen.values()].filter(l => now - l.at >= min && now - l.at <= max && !this.judged.has(l.mint) && !this.o.service.lookup({ mint: l.mint }));
   }
 
-  /** One draw: a uniformly random eligible launch, judged once. Returns the mint judged, or null. */
+  /** Tokens judged before whose latest verdict has been graded alive at its last horizon, due for another look. */
+  survivors(now = this.o.now?.() ?? Math.floor(Date.now() / 1000)): StoredVerdict[] {
+    const gap = this.o.survivorMinGapSec ?? 3600, cap = this.o.maxVerdictsPerMint ?? 3;
+    const perMint = new Map<string, StoredVerdict[]>();
+    for (const v of this.o.service.all()) { const l = perMint.get(v.mint) ?? []; l.push(v); perMint.set(v.mint, l); }
+    const out: StoredVerdict[] = [];
+    for (const [mint, vs] of perMint) {
+      if (vs.length >= cap || this.gone.has(mint)) continue;
+      const latest = vs.reduce((a, b) => (b.stored.at > a.stored.at ? b : a));
+      const last = latest.outcomes?.[latest.outcomes.length - 1];
+      if (last && !last.rugged && now - latest.stored.at >= gap) out.push(latest);
+    }
+    return out;
+  }
+
+  /** A random survivor that still trades right now, or null. Dead ones are remembered and skipped from then on. */
+  private async pickSurvivor(now: number, random: () => number): Promise<StoredVerdict | null> {
+    const pool = this.survivors(now);
+    const read = this.o.fetchMarket ?? (m => fetchMarket(m));
+    for (let tries = 0; tries < 5 && pool.length; tries++) {
+      const [v] = pool.splice(Math.floor(random() * pool.length), 1);
+      let m: MarketData | null;
+      try { m = await read(v!.mint); } catch { continue; }
+      if (m && m.priceUsd != null && m.txns24h > 0) return v!;
+      this.gone.add(v!.mint);
+    }
+    return null;
+  }
+
+  /** One draw: a survivor judged again, or a uniformly random eligible launch judged once. Returns the mint judged, or null. */
   async tick(): Promise<string | null> {
     if (this.busy) return null;
     const now = this.o.now?.() ?? Math.floor(Date.now() / 1000);
     const day = new Date(now * 1000).toISOString().slice(0, 10);
     if (day !== this.day) { this.day = day; this.today = 0; }
     if (this.today >= (this.o.perDay ?? 48)) return null;
+    const random = this.o.random ?? Math.random;
+    if (random() < (this.o.survivorShare ?? 0.5)) {
+      this.busy = true;
+      try {
+        const s = await this.pickSurvivor(now, random);
+        if (s) {
+          this.today++;
+          const v = await this.o.service.verdict(s.mint, undefined, { fresh: true });
+          this.o.log?.(`sample · survivor ${s.mint.slice(0, 6)} · was ${s.verdict} ${s.riskScore} ${Math.round((now - s.stored.at) / 3600)} h ago · now ${v.verdict} ${v.riskScore} · ${this.today}/${this.o.perDay ?? 48} today`);
+          return s.mint;
+        }
+      } catch (e) {
+        this.o.log?.(`sample · survivor failed: ${e instanceof Error ? e.message : e}`);
+        return null;
+      } finally { this.busy = false; }
+    }
     const pool = this.candidates(now);
     if (!pool.length) { this.o.log?.(`sample · nothing eligible (${this.seen.size} launches seen in the last ${Math.round((this.o.maxAgeSec ?? 1800) / 60)} min)`); return null; }
-    const pick = pool[Math.floor((this.o.random ?? Math.random)() * pool.length)]!;
+    const pick = pool[Math.floor(random() * pool.length)]!;
     this.busy = true;
     this.judged.add(pick.mint);
     this.today++;

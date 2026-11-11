@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { AGENTS, ago, ccdscanTx, getJSON, short, type TrackReport, type TrackSummary } from "@/lib/api";
+import { AGENTS, ago, ccdscanTx, getJSON, horizonLabel, short, type GuaranteeReport, type LearnedWeight, type TrackReport, type TrackSummary } from "@/lib/api";
 import { WORD } from "@/lib/verdict";
 
 const f2 = (x: number | null | undefined, d = 3) => (x == null ? "—" : x.toFixed(d));
@@ -14,17 +14,20 @@ export function TrackView() {
   const [r, setR] = useState<TrackReport | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [h, setH] = useState<number | null>(null);
+  const [g, setG] = useState<GuaranteeReport | null>(null);
   useEffect(() => {
-    const load = () => getJSON<TrackReport>("/track").then(setR).catch(e => setErr(String(e)));
+    const load = () => { getJSON<GuaranteeReport>("/guarantee").then(setG).catch(() => undefined); return getJSON<TrackReport>("/track").then(setR).catch(e => setErr(String(e))); };
     load(); const t = setInterval(load, 30_000); return () => clearInterval(t);
   }, []);
   const horizons = r?.horizons ?? [];
   const sel = horizons.find(x => x.horizon === h) ?? horizons.find(x => x.horizon === 86400 && x.graded > 0) ?? horizons.find(x => x.graded > 0) ?? horizons[0];
+  const superseded = r?.superseded ?? [];
+  const weights = r?.weights;
   return (
     <div className="mx-auto max-w-7xl px-4 py-12">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div><div className="display text-red text-sm">TRACK RECORD</div><h1 className="display text-[clamp(40px,7vw,96px)]">WAS IT RIGHT?</h1></div>
-        <p className="text-fg-2 max-w-md">Every verdict is sealed on Concordium before the outcome and graded after it. <span className="mono text-fg">riskScore/100</span> is the forecast P(rug); a rug is liquidity down more than 99%, no trades left, the labels of arXiv:2608.20271, or a pool under 1% of market cap.</p>
+        <p className="text-fg-2 max-w-md">Every verdict is sealed on Concordium before the outcome and graded after it. <span className="mono text-fg">riskScore/100</span> is the forecast P(rug); a rug is liquidity down more than 99%, no trades left, the labels of arXiv:2608.20271, or a pool under 1% of market cap. On a bonding curve the liquidity is the SOL buyers put in, read from the curve price.</p>
       </div>
 
       {err && <div className="mt-8 rounded-2xl border border-red p-6 mono text-sm text-red">track: {err}</div>}
@@ -37,6 +40,11 @@ export function TrackView() {
         </div>
         {r && <span className="mono text-xs text-fg-4 ml-auto">{r.graded} of {r.verdicts} verdicts graded · {r.pending} waiting</span>}
       </div>
+      {superseded.length > 0 && (
+        <div className="mt-3 mono text-[11px] text-fg-4">
+          labelling rule {r?.rule} is scored here · {superseded.map(x => `${x.graded} ${x.label} grades`).join(", ")} made under rule {superseded[0]!.rule} stay on chain and in the table below but are not mixed into these scores: rule {superseded[0]!.rule} read every priced bonding-curve token as drained and a delisted one as alive
+        </div>
+      )}
 
       <div className="mt-6"><Tiles s={sel?.judge ?? null} graded={r?.graded ?? 0} verdicts={r?.verdicts ?? 0} pending={r?.pending ?? 0} loading={!r} /></div>
 
@@ -50,7 +58,7 @@ export function TrackView() {
           <div className="rounded-2xl border border-line-2 p-4">
             {!sel || sel.agents.length === 0 ? <div className="mono text-xs text-fg-4">no graded calls yet</div> : (
               <div className="tt-wrap"><table className="tt">
-                <thead><tr><th>agent</th><th className="text-right">graded</th><th className="text-right">brier</th><th className="text-right">skill</th><th className="text-right">precision</th><th className="text-right">recall</th></tr></thead>
+                <thead><tr><th>agent</th><th className="text-right">graded</th><th className="text-right">brier</th><th className="text-right">skill</th><th className="text-right">precision</th><th className="text-right">recall</th><th className="text-right">weight</th></tr></thead>
                 <tbody>{sel.agents.map(a => (
                   <tr key={a.agent} className="row">
                     <td className="text-fg">{name(a.agent)}</td>
@@ -59,14 +67,17 @@ export function TrackView() {
                     <td className={`text-right ${a.summary.skill != null && a.summary.skill < 0 ? "text-red" : "text-fg-3"}`}>{signed(a.summary.skill)}</td>
                     <td className="text-right text-fg-3">{pct(a.summary.confusion.precision)}</td>
                     <td className="text-right text-fg-3">{pct(a.summary.confusion.recall)}</td>
+                    <td className="text-right"><Weight w={weights?.agents[a.agent]} /></td>
                   </tr>
                 ))}</tbody>
               </table></div>
             )}
-            <div className="mono text-[11px] text-fg-4 mt-3">a white Brier beats the judge at this horizon</div>
+            <div className="mono text-[11px] text-fg-4 mt-3">a white Brier beats the judge at this horizon · weight is what the consensus rule gives the agent on the next verdict: {weights?.source.source === "track" ? `its prior moved by ${weights.source.graded} graded ${horizonLabel(weights.source.horizon ?? 86400)} outcomes (exponential weights on Brier loss, shrunk while the history is thin)` : "the prior, until 30 outcomes are graded at 24h"}</div>
           </div>
         </div>
       </div>
+
+      {g?.book && Object.keys(g.book).length > 0 && <Book g={g} />}
 
       <div className="mt-12">
         <div className="flex items-baseline justify-between gap-4 mb-4"><div className="display text-sm text-red">GRADED VERDICTS · LATEST FIRST</div>{r && <span className="mono text-xs text-fg-4">{r.recent.length} rows</span>}</div>
@@ -101,6 +112,45 @@ export function TrackView() {
       </div>
     </div>
   );
+}
+
+const UNIT: Record<string, number> = { CCD: 1e6, EUDemo: 1e6 };
+const money = (raw: string, asset: string) => { const v = Number(raw) / (UNIT[asset] ?? 1e6); return `${v.toLocaleString("en", { maximumFractionDigits: 2 })} ${asset}`; };
+
+/** What being wrong has cost: paid verdicts in, refunds out, per asset. The numbers come from /guarantee and every refund is a transfer on CCDScan. */
+function Book({ g }: { g: GuaranteeReport }) {
+  const rows = Object.entries(g.book ?? {});
+  return (
+    <div className="mt-12">
+      <div className="flex flex-wrap items-baseline justify-between gap-4 mb-4">
+        <div className="display text-sm text-red">THE COST OF BEING WRONG</div>
+        {g.pool && <a className="mono text-xs text-fg-3 hover:text-fg" href={g.pool.explorer} target="_blank" rel="noreferrer">refund pool {short(g.pool.account, 5)} ↗</a>}
+      </div>
+      <div className="rounded-2xl border border-line-2 p-4">
+        <div className="tt-wrap"><table className="tt">
+          <thead><tr><th>asset</th><th className="text-right">paid verdicts</th><th className="text-right">earned</th><th className="text-right">refunded</th><th className="text-right">net</th><th className="text-right">still at risk</th></tr></thead>
+          <tbody>{rows.map(([asset, b]) => (
+            <tr key={asset} className="row">
+              <td className="text-fg">{asset}</td>
+              <td className="text-right text-fg-3">{b.paid}</td>
+              <td className="text-right display-num text-base">{money(b.revenue, asset)}</td>
+              <td className={`text-right display-num text-base ${b.refunds > 0 ? "text-red" : "text-fg-3"}`}>{money(b.refunded, asset)}{b.refunds > 0 ? <span className="mono text-xs text-fg-4"> · {b.refunds}</span> : null}</td>
+              <td className={`text-right display-num text-base ${Number(b.net) < 0 ? "text-red" : "text-fg"}`}>{money(b.net, asset)}</td>
+              <td className="text-right text-fg-3">{money(b.atRisk, asset)}</td>
+            </tr>
+          ))}</tbody>
+        </table></div>
+        <div className="mono text-[11px] text-fg-4 mt-3">{g.terms.statement} A verdict that is not SAFE carries no cover, and SAFE is not issued for a token nobody has traded or a bonding-curve launch under a day old. At risk is what the pool owes if every undecided SAFE rugs.</div>
+      </div>
+    </div>
+  );
+}
+
+/** The agent's consensus weight, with the prior it started from when the track has moved it. */
+function Weight({ w }: { w: LearnedWeight | undefined }) {
+  if (!w) return <span className="text-fg-4">—</span>;
+  const moved = w.trust > 0 && w.weight !== w.prior;
+  return <span className="mono text-xs">{moved && <span className="text-fg-4">{w.prior.toFixed(2)} → </span>}<span className={moved ? (w.weight < w.prior ? "text-red" : "text-fg") : "text-fg-3"}>{w.weight.toFixed(2)}</span></span>;
 }
 
 function Tiles({ s, graded, verdicts, pending, loading }: { s: TrackSummary | null; graded: number; verdicts: number; pending: number; loading: boolean }) {

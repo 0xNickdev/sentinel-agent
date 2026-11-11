@@ -29,6 +29,7 @@ describe('GuaranteeBook', () => {
     book.record({ digest: D2, payer: PAYER, paymentTx: TX(2), amount: '1000000', asset: 'CCD' });
     book.record({ digest: D3, payer: PAYER, paymentTx: TX(3), amount: '1000000', asset: 'CCD' });
     expect(await book.tick()).toEqual([]);          // nothing graded yet: every claim stays open
+    expect(book.report().book.CCD).toMatchObject({ revenue: '3000000', refunded: '0', atRisk: '2000000' });   // the two SAFE payments are at risk
     grade(D1, true); grade(D2, false); grade(D3, true);
     const closed = await book.tick();
     expect(closed.map(c => [c.digest, c.status])).toEqual([[D1, 'refunded'], [D2, 'kept'], [D3, 'kept']]);
@@ -36,6 +37,8 @@ describe('GuaranteeBook', () => {
     expect(transfer).toHaveBeenCalledWith(PAYER, 1_000_000n, `sentinel refund ${D1}`, 'CCD');
     expect(await book.tick()).toEqual([]);          // closed claims are never paid twice
     expect(book.report().counts).toMatchObject({ paid: 3, covered: 2, refunded: 1, kept: 2, open: 0, refundedAmount: '1000000' });
+    // the book: three payments in, one refund out, nothing left undecided
+    expect(book.report().book).toEqual({ CCD: { revenue: '3000000', refunded: '1000000', net: '2000000', atRisk: '0', paid: 3, refunds: 1 } });
   });
 
   it('records only real settlements for known verdicts, once', () => {

@@ -11,6 +11,7 @@ interface DsPair {
   labels?: string[];
   pairCreatedAt?: number;
   priceUsd?: string;
+  priceNative?: string;
   fdv?: number;
   marketCap?: number;
   liquidity?: { usd?: number };
@@ -56,6 +57,7 @@ export function marketFromPairs(mint: string, raw: DsPair[]): MarketData | null 
     symbol: clean(top.baseToken?.symbol, 16),
     name: clean(top.baseToken?.name, 48),
     priceUsd: top.priceUsd ? Number(top.priceUsd) : null,
+    priceNative: Number(top.priceNative) > 0 ? Number(top.priceNative) : null,
     liquidityUsd: Math.round(sum(p => p.liquidity?.usd)),
     fdvUsd: top.fdv ?? top.marketCap ?? null,
     volume24hUsd: Math.round(sum(p => p.volume?.h24)),

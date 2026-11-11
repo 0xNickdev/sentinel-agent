@@ -61,6 +61,8 @@ export interface MarketData {
   symbol: string | null;
   name: string | null;
   priceUsd: number | null;
+  /** price in the quote asset (SOL on a launchpad curve); absent on records made before it was kept */
+  priceNative?: number | null;
   /** USD liquidity summed over all pairs */
   liquidityUsd: number;
   fdvUsd: number | null;

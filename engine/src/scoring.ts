@@ -61,3 +61,52 @@ export function trackSummary(xs: ScoredCall[]): TrackSummary {
   const skill = b == null || baseBrier == null ? null : baseBrier === 0 ? null : r4(1 - b / baseBrier);
   return { n: xs.length, brier: b, logScore: logScore(xs), baseRate: baseRate == null ? null : r4(baseRate), baseBrier: baseBrier == null ? null : r4(baseBrier), skill, reliability: reliability(xs), confusion: confusion(xs) };
 }
+
+// ── Reliability weights from the track ──────────────────────────────────────
+// The consensus rule weighs each specialist by how its sealed scores have
+// turned out. This is the exponentially weighted forecaster from prediction
+// with expert advice: an agent's weight falls off with its mean Brier loss.
+// Losses are taken relative to the swarm's mean, so agents that do equally
+// well keep equal weights whatever the base rate; a thin history moves a
+// weight only part of the way from its prior, and no history leaves it alone.
+
+export const TRACK_WEIGHTS = {
+  /** learning rate on the mean Brier loss: a 0.35 gap in Brier doubles or halves a weight */
+  eta: 2,
+  /** graded calls an agent needs before the track moves its weight at all */
+  minN: 30,
+  /** shrinkage: trust in the track is n / (n + shrinkK) */
+  shrinkK: 50,
+  /** bounds on the track multiplier, so no agent is silenced and none decides alone */
+  min: 0.25,
+  max: 2.5,
+} as const;
+
+export interface LearnedWeight {
+  /** what the consensus rule uses: prior × multiplier^trust */
+  weight: number;
+  prior: number;
+  /** exp(−η · (brier − swarm mean brier)), bounded; 1 when the agent has too little history */
+  multiplier: number;
+  /** n / (n + shrinkK); 0 when the agent has too little history */
+  trust: number;
+  n: number;
+  brier: number | null;
+}
+
+export function trackWeights<K extends string>(priors: Record<K, number>, calls: Partial<Record<K, ScoredCall[]>>, cfg: { eta: number; minN: number; shrinkK: number; min: number; max: number } = TRACK_WEIGHTS): Record<K, LearnedWeight> {
+  const ids = Object.keys(priors) as K[];
+  const loss = new Map<K, number>();
+  for (const id of ids) { const xs = calls[id] ?? []; if (xs.length >= cfg.minN) loss.set(id, xs.reduce((s, x) => s + (x.p - x.y) ** 2, 0) / xs.length); }
+  const ref = loss.size ? [...loss.values()].reduce((a, b) => a + b, 0) / loss.size : 0;
+  const out = {} as Record<K, LearnedWeight>;
+  for (const id of ids) {
+    const n = calls[id]?.length ?? 0, b = loss.get(id);
+    // One agent with a history has nobody to be compared with: its weight stays where it was.
+    if (b == null || loss.size < 2) { out[id] = { weight: priors[id], prior: priors[id], multiplier: 1, trust: 0, n, brier: b == null ? null : r4(b) }; continue; }
+    const multiplier = Math.min(cfg.max, Math.max(cfg.min, Math.exp(-cfg.eta * (b - ref))));
+    const trust = n / (n + cfg.shrinkK);
+    out[id] = { weight: r4(priors[id] * multiplier ** trust), prior: priors[id], multiplier: r4(multiplier), trust: r4(trust), n, brier: r4(b) };
+  }
+  return out;
+}

@@ -11,7 +11,20 @@ export interface VerdictSummary { mint: string; verdict: Band; riskScore: number
 export interface Outcome { horizon: number; at: number; labels: string[]; rugged: boolean; liquidityBps: number | null; priceBps: number | null; concordiumTx: string | null }
 export interface ReliabilityBin { lo: number; hi: number; n: number; meanForecast: number | null; observed: number | null }
 export interface TrackSummary { n: number; brier: number | null; logScore: number | null; baseRate: number | null; baseBrier: number | null; skill: number | null; reliability: ReliabilityBin[]; confusion: { threshold: number; tp: number; fp: number; tn: number; fn: number; precision: number | null; recall: number | null; mcc: number | null } }
+/** The guarantee's own accounts, per asset in its smallest unit: what verdicts earned, what went back to buyers, what is still undecided. */
+export interface GuaranteeReport {
+  terms: { statement: string; horizon: number; bands: string[] };
+  pool: { account: string; explorer: string } | null;
+  counts: { paid: number; covered: number; open: number; kept: number; refunded: number };
+  book?: Record<string, { revenue: string; refunded: string; net: string; atRisk: string; paid: number; refunds: number }>;
+}
+/** A specialist's reliability weight in the consensus rule: its prior, moved by how its sealed scores turned out. */
+export interface LearnedWeight { weight: number; prior: number; multiplier: number; trust: number; n: number; brier: number | null }
 export interface TrackReport {
+  /** labelling rule the scores were graded under; grades made under an earlier rule are counted in `superseded` only */
+  rule?: number;
+  superseded?: Array<{ rule: number; horizon: number; label: string; graded: number; judge: TrackSummary }>;
+  weights?: { source: { source: "static" | "track"; horizon?: number; rule?: number; graded?: number }; agents: Record<string, LearnedWeight> };
   horizons: Array<{ horizon: number; label: string; judge: TrackSummary; agents: Array<{ agent: string; summary: TrackSummary }>; graded: number }>;
   verdicts: number; graded: number; pending: number;
   recent: Array<{ mint: string; digest: string; verdict: Band; riskScore: number; at: number; concordiumTx: string | null; outcomes: Outcome[] }>;

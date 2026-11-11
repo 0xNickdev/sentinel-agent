@@ -57,7 +57,7 @@ for (const key of Object.keys(registry) as SentinelAgentKey[]) {
 if (metadata) {
   // Reputation from outcomes, not feedback: each agent's graded record, read from the public /track.
   type Summary = { n: number; brier: number | null; skill: number | null };
-  const track = await (await fetch(`${baseUrl}/track`)).json() as { verdicts: number; graded: number; horizons: Array<{ label: string; graded: number; judge: Summary; agents: Array<{ agent: string; summary: Summary }> }> };
+  const track = await (await fetch(`${baseUrl}/track`)).json() as { rule?: number; verdicts: number; graded: number; horizons: Array<{ label: string; graded: number; judge: Summary; agents: Array<{ agent: string; summary: Summary }> }> };
   const h = track.horizons.find(x => x.label === '24h' && x.graded > 0) ?? track.horizons.find(x => x.graded > 0) ?? track.horizons[0];
   const asOf = new Date().toISOString().slice(0, 10);
   const hex = (s: string) => Buffer.from(s, 'utf8').toString('hex');
@@ -66,7 +66,8 @@ if (metadata) {
     const s: Summary | undefined = key === 'judge' || key === 'gateway' ? h?.judge : h?.agents.find(a => a.agent === key)?.summary;
     // The registry caps metadata values well below a JSON blob, so the record is one compact line (< 64 bytes).
     const f = (x: number | null | undefined, d: number) => (x == null ? '-' : x.toFixed(d));
-    const record = `${h?.label ?? '-'} n=${s?.n ?? 0} brier=${f(s?.brier, 4)} skill=${f(s?.skill, 2)} asOf=${asOf}`;
+    // `r` is the labelling rule the grades were made under: a record is only comparable with one of the same rule.
+    const record = `${h?.label ?? '-'} r${track.rule ?? 1} n=${s?.n ?? 0} brier=${f(s?.brier, 4)} skill=${f(s?.skill, 2)} asOf=${asOf}`;
     reg.metadataTxs ??= {};
     for (const [k, v] of [['trackRecord', record], ['trackRecordUrl', `${baseUrl}/track`]] as const) {
       const u = await callRegistryTool<BuiltUpdate>('build_set_metadata', { network, token_id: reg.tokenId, key: k, value_hex: hex(v), sender: ownerAddress });

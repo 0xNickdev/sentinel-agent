@@ -96,6 +96,18 @@ export interface ConsensusResult {
   debateRounds: number;
   debated: AgentId[];
   failed: AgentId[];
+  /** whether the token has been watched long enough for SAFE to mean anything; when not, the verdict cannot be below CAUTION */
+  observation?: { sufficient: boolean; missing: string[] };
+  /** where the reliability weights came from: the static priors, or priors moved by the graded track */
+  weights?: WeightsSource;
+}
+
+export interface WeightsSource {
+  source: 'static' | 'track';
+  /** track only: the horizon the outcomes were graded at, the labelling rule, and how many graded verdicts stood behind the weights */
+  horizon?: number;
+  rule?: number;
+  graded?: number;
 }
 
 // ── The council: anonymous peer ranking of findings by evidential strength ─

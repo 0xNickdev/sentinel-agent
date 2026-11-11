@@ -4,7 +4,8 @@
 // the track page scores the whole history with proper scoring rules. This is
 // the accountability the registry badge does not carry: not "we are verified",
 // but "here is every call we made, and here is how it turned out".
-import { HORIZONS, fetchMarket, gradeOutcome, trackSummary, type MarketData, type ScoredCall, type TrackSummary } from '@sentinel/engine';
+import { AGENT_WEIGHTS, type AgentId, type WeightsSource } from '@sentinel/agents';
+import { HORIZONS, OUTCOME_RULE, fetchMarket, gradeOutcome, trackSummary, trackWeights, type LearnedWeight, type MarketData, type MarketPoint, type ScoredCall, type TrackSummary } from '@sentinel/engine';
 import type { AuditClient } from './audit.js';
 import { toBps } from './audit.js';
 import type { Account } from './chain.js';
@@ -28,13 +29,20 @@ export interface ResolverOptions {
 export const DEFAULT_HORIZONS = [HORIZONS.h1, HORIZONS.d1, HORIZONS.d7];
 
 /** What the verdict saw of the market, from the evidence it was judged on. */
-export const marketThen = (v: StoredVerdict) => ({
+export const marketThen = (v: StoredVerdict): MarketPoint => ({
   at: v.at,
   liquidityUsd: v.evidence.market?.liquidityUsd ?? v.evidence.liquidity.liquidityUsd ?? null,
   priceUsd: v.evidence.market?.priceUsd ?? null,
   txns24h: v.evidence.market?.txns24h ?? null,
   fdvUsd: v.evidence.market?.fdvUsd ?? null,
+  onCurve: v.evidence.market ? v.evidence.market.onCurve : v.evidence.liquidity.kind === 'bonding_curve',
+  priceNative: v.evidence.market?.priceNative ?? null,
+  venue: v.evidence.market?.topVenue ?? null,
+  listed: v.evidence.market != null,
 });
+
+/** The same reading of the market at the horizon. */
+export const marketNow = (m: MarketData, at: number): MarketPoint => ({ at, liquidityUsd: m.liquidityUsd, priceUsd: m.priceUsd, txns24h: m.txns24h, fdvUsd: m.fdvUsd, onCurve: m.onCurve, priceNative: m.priceNative ?? null, venue: m.topVenue, listed: true });
 
 export class Resolver {
   private timer: NodeJS.Timeout | null = null;
@@ -67,7 +75,7 @@ export class Resolver {
         if (budget <= 0) break;
         let market: MarketData | null;
         try { market = await fetch(v.mint); } catch (e) { this.o.log?.(`resolve · ${v.mint.slice(0, 6)} market: ${e instanceof Error ? e.message : e}`); continue; }
-        const nowPoint = market ? { at: now, liquidityUsd: market.liquidityUsd, priceUsd: market.priceUsd, txns24h: market.txns24h, fdvUsd: market.fdvUsd } : null;
+        const nowPoint = market ? marketNow(market, now) : null;
         for (const h of horizons) {
           if (budget-- <= 0) break;
           const graded = gradeOutcome({ then: marketThen(v), now: nowPoint }, h);
@@ -101,6 +109,11 @@ export class Resolver {
 }
 
 export interface TrackReport {
+  /** the labelling rule the scores below were graded under; grades made under an earlier rule are counted in `superseded`, not scored with these */
+  rule: number;
+  superseded: Array<{ rule: number; horizon: number; label: string; graded: number; judge: TrackSummary }>;
+  /** the reliability weights the consensus rule is using now, and what the track says about each agent */
+  weights: { source: WeightsSource; agents: Record<AgentId, LearnedWeight> };
   horizons: Array<{ horizon: number; label: string; judge: TrackSummary; agents: Array<{ agent: string; summary: TrackSummary }>; graded: number }>;
   verdicts: number;
   graded: number;
@@ -110,22 +123,51 @@ export interface TrackReport {
 
 const label = (h: number) => (h === HORIZONS.h1 ? '1h' : h === HORIZONS.d1 ? '24h' : h === HORIZONS.d7 ? '7d' : `${h}s`);
 
+const ruleOf = (o: StoredOutcome) => o.rule ?? 1;
+
+/** Sealed scores against graded outcomes at one horizon, under one labelling rule: the judge's and each specialist's. */
+export function scoredCalls(verdicts: StoredVerdict[], horizon: number, rule: number = OUTCOME_RULE): { judge: ScoredCall[]; agents: Map<string, ScoredCall[]> } {
+  const judge: ScoredCall[] = [];
+  const agents = new Map<string, ScoredCall[]>();
+  for (const v of verdicts) {
+    const o = v.outcomes?.find(x => x.horizon === horizon && ruleOf(x) === rule);
+    if (!o) continue;
+    const y = o.rugged ? 1 : 0;
+    judge.push({ p: v.riskScore / 100, y });
+    for (const f of v.findings) { const list = agents.get(f.agent) ?? []; list.push({ p: f.riskScore / 100, y }); agents.set(f.agent, list); }
+  }
+  return { judge, agents };
+}
+
+/** The horizon the weights are learned at: one day, the horizon the guarantee is written against. */
+export const WEIGHTS_HORIZON = HORIZONS.d1;
+
+/**
+ * Reliability weights for the next verdict, from every verdict already graded. Only grades made under the current rule
+ * count, and only outcomes known before this call, so a weight never sees the outcome of the verdict it is used on.
+ */
+export function learnedWeights(verdicts: StoredVerdict[], horizon: number = WEIGHTS_HORIZON): { byAgent: Record<AgentId, number>; source: WeightsSource; agents: Record<AgentId, LearnedWeight> } {
+  const { judge, agents } = scoredCalls(verdicts, horizon);
+  const learned = trackWeights(AGENT_WEIGHTS, Object.fromEntries(agents) as Partial<Record<AgentId, ScoredCall[]>>);
+  const moved = Object.values(learned).some(w => w.trust > 0);
+  const byAgent = Object.fromEntries(Object.entries(learned).map(([id, w]) => [id, w.weight])) as Record<AgentId, number>;
+  return { byAgent, agents: learned, source: moved ? { source: 'track', horizon, rule: OUTCOME_RULE, graded: judge.length } : { source: 'static' } };
+}
+
 /** Score the whole history: judge and each specialist, per horizon. riskScore/100 is P(rug). */
 export function trackReport(verdicts: StoredVerdict[], horizons: number[] = DEFAULT_HORIZONS, recentLimit = 50): TrackReport {
   const perHorizon = horizons.map(h => {
-    const judge: ScoredCall[] = [];
-    const agents = new Map<string, ScoredCall[]>();
-    for (const v of verdicts) {
-      const o = v.outcomes?.find(x => x.horizon === h);
-      if (!o) continue;
-      const y = o.rugged ? 1 : 0;
-      judge.push({ p: v.riskScore / 100, y });
-      for (const f of v.findings) { const list = agents.get(f.agent) ?? []; list.push({ p: f.riskScore / 100, y }); agents.set(f.agent, list); }
-    }
+    const { judge, agents } = scoredCalls(verdicts, h);
     return { horizon: h, label: label(h), judge: trackSummary(judge), agents: [...agents.entries()].map(([agent, xs]) => ({ agent, summary: trackSummary(xs) })).sort((a, b) => (a.summary.brier ?? 1) - (b.summary.brier ?? 1)), graded: judge.length };
   });
+  const olderRules = [...new Set(verdicts.flatMap(v => (v.outcomes ?? []).map(ruleOf)))].filter(r => r !== OUTCOME_RULE).sort((a, b) => b - a);
+  const superseded = olderRules.flatMap(rule => horizons.map(h => { const { judge } = scoredCalls(verdicts, h, rule); return { rule, horizon: h, label: label(h), graded: judge.length, judge: trackSummary(judge) }; })).filter(x => x.graded > 0);
+  const { source, agents: weightAgents } = learnedWeights(verdicts);
   const graded = verdicts.filter(v => (v.outcomes?.length ?? 0) > 0).length;
   return {
+    rule: OUTCOME_RULE,
+    superseded,
+    weights: { source, agents: weightAgents },
     horizons: perHorizon,
     verdicts: verdicts.length,
     graded,

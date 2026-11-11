@@ -16,6 +16,10 @@ export const CONSENSUS = {
   vetoFloor: 'DANGER' as VerdictBand,
   /** how far the judge may move the risk score from the weighted mean (no veto) */
   judgeLatitude: 20,
+  /** without enough observation the verdict can never be below this: nothing found is not the same as safe */
+  unobservedFloor: 'CAUTION' as VerdictBand,
+  /** a token still on its bonding curve must have lived this long before it can be called SAFE; nearly every launch is dead within a day */
+  curveMinAgeSec: 86_400,
 } as const;
 
 /** Hard-fail flag codes and the specialist whose domain owns them. */
@@ -28,7 +32,7 @@ export const VETO_CODES: Record<string, AgentId> = {
   dev_cashed_out: 'flows',
 };
 
-/** Static reliability weights until outcome tracking feeds the registry's reputation back in. */
+/** Prior reliability weights. The graded track moves them (engine `trackWeights`); with no track yet they are used as they are. */
 export const AGENT_WEIGHTS: Record<AgentId, number> = {
   contract: 1.2,
   funding: 1.15,
@@ -70,12 +74,32 @@ export function dataCompleteness(evidence: Evidence): { score: number; missing: 
   return { score: round((weights - missing.length) / weights), missing };
 }
 
+/**
+ * Has the token been watched long enough for SAFE to mean anything? The track showed what happens without this: specialists
+ * that find nothing in their own domain score a minutes-old launch low, the mean lands in SAFE, and the token is dead the
+ * next day. Absence of evidence is reported as such and floors the verdict at CAUTION.
+ */
+export function observation(evidence: Evidence, at: number): { sufficient: boolean; missing: string[] } {
+  const missing: string[] = [];
+  const m = evidence.market;
+  if (m == null) missing.push('no market: the token is not listed anywhere yet');
+  else {
+    if (m.priceUsd == null) missing.push('no price: nothing has traded');
+    else if (m.txns24h === 0) missing.push('no trades in the last 24 h');
+    if (m.onCurve) {
+      const age = m.oldestPairAt == null ? null : at - m.oldestPairAt;
+      if (age == null || age < CONSENSUS.curveMinAgeSec) missing.push(`still on its bonding curve and ${age == null ? 'of unknown age' : `${Math.max(0, Math.round(age / 360) / 10)} h old`}: under ${CONSENSUS.curveMinAgeSec / 3600} h of history`);
+    }
+  }
+  return { sufficient: missing.length === 0, missing };
+}
+
 /** Effective reliability weight: the static weight, scaled by the council score when the peers have ranked this agent. */
 export function effectiveWeight(weight: number, councilScore: number | undefined): number {
   return councilScore == null ? weight : weight * (COUNCIL_WEIGHT.floor + COUNCIL_WEIGHT.span * clamp(councilScore, 0, 1));
 }
 
-export function aggregate(findings: AgentFinding[], evidence: Evidence, vetoes: Veto[], extra: Pick<ConsensusResult, 'debateRounds' | 'debated' | 'failed'>, councilScores?: CouncilResult['scores'] | null): ConsensusResult {
+export function aggregate(findings: AgentFinding[], evidence: Evidence, vetoes: Veto[], extra: Pick<ConsensusResult, 'debateRounds' | 'debated' | 'failed' | 'weights' | 'observation'>, councilScores?: CouncilResult['scores'] | null): ConsensusResult {
   let num = 0, den = 0;
   for (const f of findings) {
     const w = effectiveWeight(f.weight, councilScores?.[f.agent]) * clamp(f.confidence, 0.05, 1);
@@ -87,6 +111,7 @@ export function aggregate(findings: AgentFinding[], evidence: Evidence, vetoes: 
   const scores = findings.map(f => f.riskScore);
   const spread = scores.length > 1 ? Math.max(...scores) - Math.min(...scores) : 0;
   let suggestedBand = scoreToBand(weightedScore);
+  if (extra.observation && !extra.observation.sufficient && bandIndex(suggestedBand) < bandIndex(CONSENSUS.unobservedFloor)) suggestedBand = CONSENSUS.unobservedFloor;
   if (vetoes.length && bandIndex(suggestedBand) < bandIndex(CONSENSUS.vetoFloor)) suggestedBand = CONSENSUS.vetoFloor;
   return { rule: 'veto+confidence_weighted_mean', weightedScore, spread, suggestedBand, completeness: dataCompleteness(evidence), ...extra };
 }
@@ -135,6 +160,10 @@ export function reconcile(out: JudgeOutput, consensus: ConsensusResult, vetoes: 
     const critical = evidence.flags.some(f => f.severity === 'critical');
     const lo = Math.round(consensus.weightedScore - CONSENSUS.judgeLatitude), hi = critical ? 100 : Math.round(consensus.weightedScore + CONSENSUS.judgeLatitude);
     if (riskScore < lo || riskScore > hi) { overridden.push(`riskScore ${riskScore} clamped to [${Math.max(0, lo)}, ${Math.min(100, hi)}] around weighted mean ${consensus.weightedScore}`); riskScore = clamp(riskScore, lo, hi); }
+  }
+  if (consensus.observation && !consensus.observation.sufficient && riskScore < CONSENSUS.cautionFrom) {
+    overridden.push(`riskScore ${riskScore} raised to ${CONSENSUS.cautionFrom}: not enough observation for SAFE (${consensus.observation.missing.join('; ')})`);
+    riskScore = CONSENSUS.cautionFrom;
   }
   // the band must agree with the score it sits on; RUGGED sits in the DANGER range
   if (verdict === 'RUGGED') {

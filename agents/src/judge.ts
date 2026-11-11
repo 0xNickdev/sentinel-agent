@@ -15,6 +15,7 @@ How the swarm decides:
 - spread is the distance between the most and least alarmed specialist. Above ${CONSENSUS.debateSpread} a debate round ran and revised findings are marked.
 - Bands: SAFE below ${CONSENSUS.cautionFrom}, CAUTION from ${CONSENSUS.cautionFrom}, DANGER from ${CONSENSUS.dangerFrom}. RUGGED only when the exit already happened: creator sold everything, or liquidity is gone (the liquidity_drained flag).
 - Confidence falls with disagreement and with missing data (completeness.missing). Do not exceed the completeness score by much.
+- consensus.observation says whether the token has been watched long enough for SAFE to mean anything. When sufficient is false (no trades yet, or a bonding-curve launch under a day old) the rule will not let the verdict below CAUTION: specialists finding nothing in their own domain is absence of evidence, and nearly every launch is dead within a day. Say so plainly instead of calling it safe.
 - council (when present) is the specialists' anonymous peer assessment of evidential strength: each specialist ranked the other findings, without knowing who wrote them, by how firmly they rest on verified on-chain facts that bear on whether a holder loses money. council.scores (0-1, 1 = always ranked strongest) already scale the weights behind weightedScore. Treat it as a second opinion on which findings to trust, never as a vote on the verdict: a low-scored finding may still hold the decisive fact, and a high score does not make a clean finding a reason to relax.
 
 How you write:
@@ -73,7 +74,7 @@ export function advocateUserMessage(snapshot: TokenSnapshot, evidence: Evidence,
     market: evidence.market,
     liquidity: evidence.liquidity,
     findings: findings.map(f => ({ agent: f.agent, riskScore: f.riskScore, confidence: f.confidence, label: f.label, summary: f.summary, notable: f.notable })),
-    consensus: { weightedScore: consensus.weightedScore, spread: consensus.spread, completeness: consensus.completeness },
+    consensus: { weightedScore: consensus.weightedScore, spread: consensus.spread, completeness: consensus.completeness, observation: consensus.observation },
   };
   return `${direction}\n\nSwarm output (JSON):\n${JSON.stringify(payload, null, 1)}\n\nMake your case.`;
 }

@@ -1,7 +1,7 @@
 export * from './schema.js';
 export { runSwarm, judgeToken, ENGINE_VERSION, type SwarmOptions } from './swarm.js';
 export { AnthropicLLM, LLMError, type LLM, type StructuredRequest, type StructuredResult } from './llm.js';
-export { CONSENSUS, VETO_CODES, AGENT_WEIGHTS, detectVetoes, aggregate, effectiveWeight, reconcile, scoreToBand, dataCompleteness, pickDebaters, rugEvidence } from './consensus.js';
+export { CONSENSUS, VETO_CODES, AGENT_WEIGHTS, detectVetoes, observation, aggregate, effectiveWeight, reconcile, scoreToBand, dataCompleteness, pickDebaters, rugEvidence } from './consensus.js';
 export { COUNCIL_SYSTEM, COUNCIL_WEIGHT, COUNCIL_RANKING_SCHEMA, councilBrief, decodeRanking, councilScores, type CouncilRankingOutput } from './council.js';
 export { SPECIALISTS, SHARED_SYSTEM, specialistById, type Specialist } from './specialists.js';
 export { JUDGE_SYSTEM, ADVOCATE_SYSTEM } from './judge.js';

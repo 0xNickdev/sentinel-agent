@@ -3,12 +3,12 @@
 // disagree, let the judge speak, reconcile, hash. Returns an async generator
 // so callers (CLI, MCP server, web UI) see the swarm work in real time.
 import { analyze, verdictDigest, type Evidence, type TokenSnapshot } from '@sentinel/engine';
-import { ALL_AGENTS, agentWeight, aggregate, detectVetoes, pickDebaters, reconcile } from './consensus.js';
+import { ALL_AGENTS, agentWeight, aggregate, detectVetoes, observation, pickDebaters, reconcile } from './consensus.js';
 import { COUNCIL_RANKING_SCHEMA, COUNCIL_SYSTEM, councilBrief, councilScores, decodeRanking, pooled } from './council.js';
 import { modelConfig } from './env.js';
 import { ADVOCATE_SYSTEM, JUDGE_SYSTEM, advocateUserMessage, judgeUserMessage } from './judge.js';
 import type { LLM } from './llm.js';
-import { AdvocateOutputSchema, FindingSchema, JudgeOutputSchema, type AdvocateOutput, type AgentFinding, type AgentId, type CouncilRanking, type Effort, type SwarmEvent, type TimelineEntry, type Verdict } from './schema.js';
+import { AdvocateOutputSchema, FindingSchema, JudgeOutputSchema, type AdvocateOutput, type AgentFinding, type AgentId, type CouncilRanking, type Effort, type SwarmEvent, type TimelineEntry, type Verdict, type WeightsSource } from './schema.js';
 import { SPECIALISTS, debateUserMessage, specialistSystemPrompt, specialistUserMessage, type Specialist } from './specialists.js';
 
 export const ENGINE_VERSION = '@sentinel/engine@0.1.0';
@@ -27,6 +27,8 @@ export interface SwarmOptions {
   agents?: AgentId[];
   /** Concordium Agent Registry ids once the agents are registered */
   registry?: Partial<Record<AgentId | 'judge', string>>;
+  /** reliability weights learned from the graded track; agents not named keep their prior */
+  weights?: { byAgent: Partial<Record<AgentId, number>>; source: WeightsSource };
   signal?: AbortSignal;
 }
 
@@ -100,6 +102,8 @@ export async function* runSwarm(snapshot: TokenSnapshot, opts: SwarmOptions): As
   const ch = new Channel<SwarmEvent>();
   const findings: AgentFinding[] = [];
   const failed: AgentId[] = [];
+  const weights: WeightsSource = opts.weights?.source ?? { source: 'static' };
+  const observed = observation(evidence, snapshot.at);
 
   const ask = async (sp: Specialist, user: string, phase: 'finding' | 'debate'): Promise<AgentFinding> => {
     const r = await opts.llm.structured({
@@ -109,7 +113,7 @@ export async function* runSwarm(snapshot: TokenSnapshot, opts: SwarmOptions): As
       ...(opts.signal ? { signal: opts.signal } : {}),
     });
     normalise(r.value);
-    return { ...r.value, agent: sp.id, agentName: sp.name, agentRegistryId: opts.registry?.[sp.id] ?? null, model: r.model, weight: agentWeight(sp.id), ms: r.ms, usage: r.usage };
+    return { ...r.value, agent: sp.id, agentName: sp.name, agentRegistryId: opts.registry?.[sp.id] ?? null, model: r.model, weight: opts.weights?.byAgent[sp.id] ?? agentWeight(sp.id), ms: r.ms, usage: r.usage };
   };
 
   // ── Round 1: every specialist, in parallel ──────────────────────────────
@@ -129,7 +133,7 @@ export async function* runSwarm(snapshot: TokenSnapshot, opts: SwarmOptions): As
   const agentsMs = Date.now() - t0;
 
   // ── Consensus, then one debate round if the swarm is split ─────────────
-  let consensus = aggregate(findings, evidence, vetoes, { debateRounds: 0, debated: [], failed });
+  let consensus = aggregate(findings, evidence, vetoes, { debateRounds: 0, debated: [], failed, weights, observation: observed });
   const debaters = opts.debate === false ? null : pickDebaters(findings);
   if (debaters) {
     const [lo, hi] = debaters;
@@ -149,7 +153,7 @@ export async function* runSwarm(snapshot: TokenSnapshot, opts: SwarmOptions): As
     const debate = Promise.all([rebut(lo, hi), rebut(hi, lo)]).then(() => ch2.close());
     for await (const ev of ch2) yield record(ev);
     await debate;
-    consensus = aggregate(findings, evidence, vetoes, { debateRounds: 1, debated: [lo.agent, hi.agent], failed });
+    consensus = aggregate(findings, evidence, vetoes, { debateRounds: 1, debated: [lo.agent, hi.agent], failed, weights, observation: observed });
   }
 
   // ── Council: each specialist ranks the others' findings, anonymised ─────
@@ -185,7 +189,7 @@ export async function* runSwarm(snapshot: TokenSnapshot, opts: SwarmOptions): As
     const scores = rankings.length >= 2 ? councilScores(rankings) : {};
     if (rankings.length >= 2) {
       council = { scores, rankings, ms: Date.now() - tc };
-      consensus = aggregate(findings, evidence, vetoes, { debateRounds: consensus.debateRounds, debated: consensus.debated, failed }, scores);
+      consensus = aggregate(findings, evidence, vetoes, { debateRounds: consensus.debateRounds, debated: consensus.debated, failed, weights, observation: observed }, scores);
     }
     yield record({ type: 'council', scores, rankings: rankings.length });
   }

@@ -1,7 +1,7 @@
-import { analyze, HORIZONS, type MarketData } from '@sentinel/engine';
+import { analyze, HORIZONS, OUTCOME_RULE, type MarketData } from '@sentinel/engine';
 import { cleanToken, rugToken } from '@sentinel/agents';
 import { describe, expect, it } from 'vitest';
-import { Resolver, VerdictService, marketThen, trackReport, type StoredVerdict } from '../src/index.js';
+import { Resolver, VerdictService, learnedWeights, marketThen, trackReport, type StoredVerdict } from '../src/index.js';
 
 const market = (mint: string, liquidityUsd: number, priceUsd: number, txns24h = 500): MarketData => ({
   source: 'dexscreener', symbol: 'X', name: 'X', priceUsd, liquidityUsd, fdvUsd: liquidityUsd * 10, volume24hUsd: 1000, txns24h, priceChangePct: { h1: 0, h6: 0, h24: 0 }, pairs: 1, topVenue: 'raydium', venues: ['raydium'], oldestPairAt: 1_700_000_000, onCurve: false,
@@ -66,5 +66,30 @@ describe('resolver', () => {
     expect(h1.agents[0]!.summary.brier).toBe(0.01);
     expect(report.recent[0]!.outcomes).toHaveLength(2);
     expect(marketThen(a)).toMatchObject({ at: t0, liquidityUsd: 50_000, priceUsd: 0.01 });
+  });
+
+  it('scores one labelling rule at a time and learns the consensus weights from the graded track only', () => {
+    const t0 = 1_700_000_000;
+    const grade = (v: StoredVerdict, rugged: boolean, rule?: number) => { v.outcomes = [{ horizon: HORIZONS.d1, at: t0 + HORIZONS.d1, ...(rule ? { rule } : {}), labels: rugged ? ['tvl_rug'] : [], rugged, liquidityBps: null, priceBps: null, concordiumTx: null }]; return v; };
+    // 40 verdicts graded under the current rule: the market agent called every one right, the contract agent every one wrong
+    const current = Array.from({ length: 40 }, (_, i) => grade(stored(`M${i}`.padEnd(32, 'x'), 50, t0 + i, 50_000, 0.01, [['market', i % 2 ? 90 : 10], ['contract', i % 2 ? 10 : 90]]), i % 2 === 1, OUTCOME_RULE));
+    // 20 older grades carry no rule (rule 1): the other way round, and they must not count
+    const old = Array.from({ length: 20 }, (_, i) => grade(stored(`O${i}`.padEnd(32, 'x'), 50, t0 + i, 50_000, 0.01, [['market', 10], ['contract', 90]]), true));
+
+    expect(learnedWeights(old).source).toEqual({ source: 'static' });
+    expect(learnedWeights(current.slice(0, 20)).source).toEqual({ source: 'static' });   // under minN
+    const w = learnedWeights([...current, ...old]);
+    expect(w.source).toEqual({ source: 'track', horizon: HORIZONS.d1, rule: OUTCOME_RULE, graded: 40 });
+    expect(w.agents.market).toMatchObject({ n: 40, brier: 0.01, prior: 0.8 });
+    expect(w.byAgent.market).toBeGreaterThan(0.8);
+    expect(w.byAgent.contract).toBeLessThan(1.2);
+    expect(w.byAgent.market).toBeGreaterThan(w.byAgent.contract);
+    expect(w.byAgent.holders).toBe(0.95);   // no history: the prior stands
+
+    const report = trackReport([...current, ...old]);
+    expect(report.rule).toBe(OUTCOME_RULE);
+    expect(report.horizons.find(h => h.horizon === HORIZONS.d1)!.graded).toBe(40);
+    expect(report.superseded).toMatchObject([{ rule: 1, horizon: HORIZONS.d1, label: '24h', graded: 20 }]);
+    expect(report.weights.source.source).toBe('track');
   });
 });

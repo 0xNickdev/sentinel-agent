@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { LaunchSampler, VerdictService } from '../src/index.js';
+import type { MarketData } from '@sentinel/engine';
+import { LaunchSampler, VerdictService, type StoredVerdict } from '../src/index.js';
 
 describe('launch sampler', () => {
   it('draws only launches 5-30 minutes old, judges each once, and respects the daily cap', async () => {
@@ -10,7 +11,7 @@ describe('launch sampler', () => {
     (service as unknown as { launches: () => unknown[] }).launches = () => ring;
     const judged: string[] = [];
     (service as unknown as { verdict: (m: string) => Promise<unknown> }).verdict = async (m: string) => { judged.push(m); return { verdict: 'DANGER', riskScore: 80 }; };
-    const s = new LaunchSampler({ service, everyMin: 30, perDay: 2, now: () => now, random: () => 0 });
+    const s = new LaunchSampler({ service, everyMin: 30, perDay: 2, survivorShare: 0, now: () => now, random: () => 0 });
     expect(s.candidates().map(l => l.mint[0])).toEqual(['B', 'C']);   // A too young, D too old
     expect(await s.tick()).toBe('B'.repeat(32));
     expect(s.candidates().map(l => l.mint[0])).toEqual(['C']);        // B is not drawn twice
@@ -34,5 +35,27 @@ describe('launch sampler', () => {
     expect(s.candidates(now).length).toBeGreaterThan(20);
     now += 3600;
     expect(s.candidates(now)).toHaveLength(0);  // everything aged out
+  });
+
+  it('judges survivors again: graded alive, still trading, past the gap, under the per-token cap', async () => {
+    const service = new VerdictService({ rpcUrl: 'http://127.0.0.1:1' });
+    const now = 1_800_000_000;
+    const v = (mint: string, ageH: number, outcome: boolean | null): StoredVerdict => ({ mint, verdict: 'CAUTION', riskScore: 40, stored: { at: now - ageH * 3600, auditSeq: null, auditExplorer: null }, attestation: { digest: `${mint}-${ageH}` }, outcomes: outcome == null ? [] : [{ horizon: 3600, at: now, rule: 2, labels: [], rugged: outcome, liquidityBps: null, priceBps: null, concordiumTx: null }] }) as unknown as StoredVerdict;
+    const all = [v('alive', 3, false), v('dead', 3, true), v('ungraded', 3, null), v('recent', 0.5, false), v('delisted', 3, false), v('capped', 30, false), v('capped', 20, false), v('capped', 3, false)];
+    (service as unknown as { all: () => StoredVerdict[] }).all = () => all;
+    (service as unknown as { launches: () => unknown[] }).launches = () => [];
+    const judged: string[] = [];
+    (service as unknown as { verdict: (m: string) => Promise<unknown> }).verdict = async (m: string) => { judged.push(m); return { verdict: 'SAFE', riskScore: 30 }; };
+    const market = (mint: string): MarketData | null => (mint === 'delisted' ? null : ({ priceUsd: 0.001, txns24h: 40 } as MarketData));
+    // draws: take the survivor branch, pick the last of the pool (the delisted one, found dead), then the first (alive)
+    const draws = [0.4, 0.99, 0];
+    const s = new LaunchSampler({ service, everyMin: 30, now: () => now, random: () => draws.shift() ?? 0, fetchMarket: async m => market(m) });
+    expect(s.survivors().map(x => x.mint)).toEqual(['alive', 'delisted']);
+    expect(await s.tick()).toBe('alive');
+    expect(judged).toEqual(['alive']);                           // the delisted one is never judged
+    expect(s.survivors().map(x => x.mint)).toEqual(['alive']);   // and is not looked at again
+    // with no survivors the draw falls back to launches (none here)
+    const none = new LaunchSampler({ service: Object.assign(service, { all: () => [] }), everyMin: 30, now: () => now, random: () => 0 });
+    expect(await none.tick()).toBeNull();
   });
 });

@@ -20,7 +20,7 @@ export function cleanToken(): TokenSnapshot {
     hubs: ['cex0', 'cex1', 'cex2', 'cex3', 'cex4', 'cex5', 'cex6'],
     market: {
       source: 'dexscreener', symbol: 'CLEAN', name: 'Clean Launch', priceUsd: 0.00004, liquidityUsd: 12_400, fdvUsd: 40_000, volume24hUsd: 58_000, txns24h: 912,
-      priceChangePct: { h1: 4.2, h6: 18.5, h24: null }, pairs: 1, topVenue: 'pumpfun', venues: ['pumpfun'], oldestPairAt: 1_699_999_000, onCurve: true,
+      priceChangePct: { h1: 4.2, h6: 18.5, h24: null }, pairs: 1, topVenue: 'pumpfun', venues: ['pumpfun'], oldestPairAt: 1_699_900_000, onCurve: true,
     },
     flows: [],
   };
