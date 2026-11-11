@@ -8,8 +8,8 @@
     "setUriTx": "67081b11cd5ac3e77cf181c20bb179f8e30d1eaaaff0a02a509fd38752fcfcbc",
     "refreshTx": "cee5bc071aa73b5eb4566e2b50c5e479ac6680561efa544b6facd0f2aab722e9",
     "metadataTxs": {
-      "trackRecord": "42952147169ddafb96b810c3cd966b01900afd548f485cb9ec1cd79b572b2436",
-      "trackRecordUrl": "f78ba46e258bc4a4d3af365f9616f41f52a7a96be091e7de0955ac38d1fb95b7"
+      "trackRecord": "cf3be6cb1a8b5cb7aae5c475c74fc03b9e3d1d008a73cc3224ff93a939dd9eda",
+      "trackRecordUrl": "5c39f6a6572702d9b050dedd6b216fc1f5630074eac861bc663d010b26c73b8d"
     }
   },
   "judge": {
@@ -21,8 +21,8 @@
     "setUriTx": "f4c0f2dc17cc2e54cdd6c47dcb20e2c9d5c082e84b836cdcddfd02e01eaac92e",
     "refreshTx": "caa5de358a3bf4dde993adbde266181e8996b56d32b875b7a097dc191ca73091",
     "metadataTxs": {
-      "trackRecord": "00823e6cc231d0c577f5c2c8aecf2576048ef2bdf88d700ed53c93641cc74566",
-      "trackRecordUrl": "3aa344800c5b2f2676e7a05958cce66d6befd3aefac43183ba63a020ca607287"
+      "trackRecord": "76b3e7a320c993e90143cdfde429d3de8058aaa448bf2142ef6d9afb0d52a32e",
+      "trackRecordUrl": "21136c9db108bf2c40b91ffa53c92c35aba492bca45a1b3aa6ebd18fd4da1e58"
     }
   },
   "holders": {
@@ -34,8 +34,8 @@
     "setUriTx": "3a48834a7e1da1a291929d3eabf8a07c435d66bebf0bb8d01dde816cd6be26fd",
     "refreshTx": "d99c6e21bab405c955bf5002b7dc0692fdb7e0cb0e7665f26aea7f2c450eb1b9",
     "metadataTxs": {
-      "trackRecord": "708b336270ed3663e7b94bd7eead9a346b9e070f76562bb80e0d41e4b40d5290",
-      "trackRecordUrl": "fc59d8fca4584bbfdf9cd1a1abde0ded82b801d80d7991a1c537f7361af69ef2"
+      "trackRecord": "bebfd502fd9ff331431ab5718b7b9e405c6a970a8cfa7678e2d9fbb935543e5b",
+      "trackRecordUrl": "2faeb4fbda0e992cff93cec7c35b4f3626688fe892d3c386b2f2a665b6a3641e"
     }
   },
   "snipers": {
@@ -47,8 +47,8 @@
     "setUriTx": "1b9ec8b511f60c76ac782abbdf6b61f1812616faf78782673e50ed6559455066",
     "refreshTx": "702c39dd5de35ae96a7293e5cb3b82b11c788642584d99c2c299fc685002198a",
     "metadataTxs": {
-      "trackRecord": "75b6e937769fe3dec0da9a08f2dbb658ae5599c58eafd2a008474dd2944ee242",
-      "trackRecordUrl": "26e0898719d3a9496b471c44e53e4dc7149c1b0c750cd8378b14535dba1d5f3a"
+      "trackRecord": "1adc4df34b4f935baf72989846786b9145390f544080bf35e91f48f97affb71c",
+      "trackRecordUrl": "b1221337d5b54074f6a884836cd8c10c263eed92bc8e0872d2fb863ea168e965"
     }
   },
   "funding": {
@@ -60,8 +60,8 @@
     "setUriTx": "6050a2d88379b18392ecc45f0ccc30a54f56920d89ec9d9e205beecd5c2778bc",
     "refreshTx": "981bd78b81b754d9c9a5ee305045488df1f445ca74c5f25c49a6b699fd4b1564",
     "metadataTxs": {
-      "trackRecord": "a0171dbbd37e619b9cff6b90df51a05200a7b4156aadab74b09c025a4aad7f64",
-      "trackRecordUrl": "46838e09d81ac6e2059acdce6420e0a127f93eface3a62e9fd477bc521101c5c"
+      "trackRecord": "e1cb229aaed3fac80af512d975852d67e3bfc1a64070f81a2dd8f19d18ab7545",
+      "trackRecordUrl": "8ffc449269bee61a33aaffdca9b5c43418c3038e24b57343913d5d79d6311c5c"
     }
   },
   "creator": {
@@ -73,8 +73,8 @@
     "setUriTx": "ee869ff11e28556b1cf20e03f8d9fe0154058288d3cbf3b7db5fccdf399e06d0",
     "refreshTx": "45bf1a2577bf5ea02e94ad0229c6aad3d5c1a8ac0f0badb5feb88737e83c88a4",
     "metadataTxs": {
-      "trackRecord": "556403246ef7d123a6fbcd4dcf76f34453e26b7bef39b10000be0f7258ceabcc",
-      "trackRecordUrl": "35bec28763f9c9dc6f49e5edad0e081311ba14aad609a8624712326d239d8b11"
+      "trackRecord": "3a38bf58a6e111b57094c168f203514e243408b61ec9b714125e2483be340289",
+      "trackRecordUrl": "209017070787264abf42e9bc052de4cf8d8f43947be8f49a5c488f6cd547af89"
     }
   },
   "contract": {
@@ -86,8 +86,8 @@
     "setUriTx": "1e6c99d46d0399e7ccfba2ff1d3543fd6ed154d27ab1cb088f4dc0aff501c05c",
     "refreshTx": "e558fc0b4b0bea6d8b94f5729f646b9c263c99d2eb521ee53fd7c5faf5d46edf",
     "metadataTxs": {
-      "trackRecord": "dfe392ddb76c82aba99bbf20d34fedafdfca5541862cf18d4930a6660afeaaf5",
-      "trackRecordUrl": "36ba41c96b102351aa58e7ceb3ef840239e836e8bd747fc3afe4ff5b7899026b"
+      "trackRecord": "aba13343d4b64b834db2179233981db57655a7a7f0ad550c3ab7e64a6e14650f",
+      "trackRecordUrl": "39e22b9b2f65d83676f3213315e0e80ad27815085c63a6d38fca0ad75770440c"
     }
   },
   "market": {
@@ -99,8 +99,8 @@
     "setUriTx": "7fad77411fb81c4269d669fe5bb67455532aeaeb29264ec4c464b35e22ed403e",
     "refreshTx": "ce9c55d0cabf53f26dc83a6d8bd71bcfcfee1f0e9626e35ca86dd5b415d8cfc1",
     "metadataTxs": {
-      "trackRecord": "ad7de40e49f63c2da8f8f1069d2556b2961f80a9b98d546c4637100f1485c852",
-      "trackRecordUrl": "78f620fed5852de73b2c2d6df46381c248eec9bef385427807f06d598ed96150"
+      "trackRecord": "16b3d6bc62a2c9d6cb7c8b1ae5863d6a577b5442de008b43556c945d6a6ff043",
+      "trackRecordUrl": "1292cd26bfb6d4498faa621694e9b25dffcdbe52be70983dad117370602b2d4e"
     }
   },
   "flows": {
@@ -112,8 +112,8 @@
     "setUriTx": "f48defb2305066eb4bc49fb2bb0ba7e9f5a58ee1219a7adb8e2bb6f09ce48407",
     "refreshTx": "a5a369dc0426fb208c327fc802c824a50f5987bd15af00c8d0d3b3a673d4d1d4",
     "metadataTxs": {
-      "trackRecord": "5d73c2c101420b07594be5874e50c17c1bc064ed406d7e8464b78cbc3b039891",
-      "trackRecordUrl": "9de13b358bf7fbd4a607ab8d606e32ee2b3f70046ce9abf8067d30f2870806cf"
+      "trackRecord": "34996dc06aada2076281c222f6d3d3aea5b508312962f8287b2b8ca672eaf29b",
+      "trackRecordUrl": "570f6a5e2c3bae6b9b5094cc2084c122861380c398d4f7a294eaebaa0cfd20b9"
     }
   }
 }
