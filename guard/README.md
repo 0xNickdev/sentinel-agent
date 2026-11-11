@@ -38,6 +38,16 @@ createGuard({ policy: { block: ['DANGER', 'RUGGED'], minConfidence: 0.6, maxRisk
 
 `check(mint, { mode })`: `'auto'` (default) pays only when the free screen cannot decide, `'quick'` never pays, `'full'` always pays.
 
+### Check the score, not only the badge
+
+A badge says who answers for the oracle. Its graded record says whether it has been right: every verdict is sealed on Concordium before the outcome and scored after it. Each decision carries that record in `decision.oracle.track` (`{ horizon: '24h', graded, brier, skill, rule }`), and a policy can refuse an oracle that has not earned its fee:
+
+```ts
+createGuard({ pay, policy: { minOracleSkill: 0.05, minOracleGraded: 30 } });
+```
+
+`skill` is measured against always forecasting the base rate, so positive means the oracle beats a constant guess. Below the threshold the guard blocks before anything is paid.
+
 ## Spending mandate
 
 Limits a trading bot cannot talk itself out of, because they live in code, not in the prompt.

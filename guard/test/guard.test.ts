@@ -65,6 +65,24 @@ suite('createGuard', () => {
     expect(pay).not.toHaveBeenCalled();
   });
 
+  it('reads the oracle\'s graded record and, when the policy asks, refuses one that has not earned it', async () => {
+    const track = (graded: number, skill: number | null) => ({ rule: 2, horizons: [{ label: '1h', graded: 500, judge: { brier: 0.1, skill: 0.5 } }, { label: '24h', graded, judge: { brier: 0.18, skill } }] });
+    const route = (t: unknown): Route => u => (u.endsWith('/track') ? { body: t } : u.includes('/quick/') ? { body: CLEAN } : undefined);
+    // by default the record is reported, not required
+    const seen = await createGuard({ fetch: mockFetch(route(track(120, 0.21))) }).check(MINT, { mode: 'quick' });
+    expect(seen.oracle.track).toEqual({ horizon: '24h', graded: 120, brier: 0.18, skill: 0.21, rule: 2 });
+    expect(seen.action).toBe('warn');
+    const policy = { minOracleSkill: 0.1 };
+    expect((await createGuard({ fetch: mockFetch(route(track(120, 0.21))), policy }).check(MINT, { mode: 'quick' })).source).toBe('quick');
+    for (const t of [track(120, 0.02), track(12, 0.4), track(120, null), { error: 'none' }]) {
+      const pay = mockFetch(() => ({ body: FULL_SAFE }));
+      const d = await createGuard({ fetch: mockFetch(route(t)), pay, policy }).check(MINT);
+      expect(d).toMatchObject({ action: 'block', source: 'oracle' });
+      expect(d.reason).toContain('graded record is below policy');
+      expect(pay).not.toHaveBeenCalled();
+    }
+  });
+
   it('refuses an oracle whose badge does not verify, or belongs to another host', async () => {
     const bad = mockFetch(u => (u.includes('/check-badge/') ? { body: { badge_valid: false, issues: ['hash mismatch'] } } : undefined));
     expect(await createGuard({ fetch: bad }).check(MINT)).toMatchObject({ action: 'block', source: 'oracle' });

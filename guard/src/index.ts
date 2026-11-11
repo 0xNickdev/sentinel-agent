@@ -29,11 +29,15 @@ export interface Decision {
   audit: { digest: string; concordiumTx: string | null; url: string } | null;
   /** x402 settlement transaction when this check paid for a verdict */
   paidTx: string | null;
-  oracle: { badge: string | null; verified: boolean; owner: string | null };
+  /** the oracle itself: its Verified by Concordium badge, and its outcome-graded record (sealed verdicts scored against what happened; every grade is on the audit contract) */
+  oracle: { badge: string | null; verified: boolean; owner: string | null; track: OracleTrack | null };
   /** set when this check paid for a verdict the gateway's guarantee covers: refunded automatically if the token rugs */
   guarantee: { statement: string; horizonSec: number } | null;
   at: number;
 }
+
+/** The oracle's judge at the 24 h horizon: how many sealed verdicts have been graded, their Brier score, and skill against always forecasting the base rate (positive beats it). */
+export interface OracleTrack { horizon: string; graded: number; brier: number | null; skill: number | null; rule: number | null }
 
 export interface Policy {
   /** bands that always block */
@@ -46,6 +50,10 @@ export interface Policy {
   quickSafe: 'warn' | 'allow';
   /** reuse a full verdict someone already paid for if it is younger than this (seconds); 0 disables */
   reuseFullSec: number;
+  /** refuse the oracle unless its judge's skill against the base rate at 24 h is at least this; null (default) does not ask */
+  minOracleSkill: number | null;
+  /** and unless at least this many verdicts stand behind that skill */
+  minOracleGraded: number;
 }
 
 /**
@@ -63,7 +71,7 @@ export interface Mandate {
   expiresAt?: number;
 }
 
-export const DEFAULT_POLICY: Policy = { block: ['DANGER', 'RUGGED'], minConfidence: 0.6, maxRisk: 40, quickSafe: 'warn', reuseFullSec: 3600 };
+export const DEFAULT_POLICY: Policy = { block: ['DANGER', 'RUGGED'], minConfidence: 0.6, maxRisk: 40, quickSafe: 'warn', reuseFullSec: 3600, minOracleSkill: null, minOracleGraded: 30 };
 
 export interface GuardOptions {
   /** Sentinel gateway (default https://api.sentinelagent.pro) */
@@ -144,6 +152,15 @@ export function createGuard(o: GuardOptions = {}): Guard {
     return { status: res.status, body: body as T, headers: res.headers };
   }
 
+  /** The oracle's public graded record at 24 h; null when it publishes none. Never throws: a missing record is a fact the policy decides on. */
+  async function oracleTrack(): Promise<OracleTrack | null> {
+    try {
+      const t = (await json<{ rule?: number; horizons?: Array<{ label: string; graded: number; judge: { brier: number | null; skill: number | null } }> }>(`${gateway}/track`)).body;
+      const h = t?.horizons?.find(x => x.label === '24h');
+      return h ? { horizon: h.label, graded: h.graded, brier: h.judge.brier, skill: h.judge.skill, rule: t?.rule ?? null } : null;
+    } catch { return null; }
+  }
+
   async function oracle(): Promise<Decision['oracle'] & { issues: string[] }> {
     if (oracleCache && oracleCache.until > Date.now()) return oracleCache.v;
     const issues: string[] = [];
@@ -163,7 +180,7 @@ export function createGuard(o: GuardOptions = {}): Guard {
         else verified = true;
       }
     } catch (e) { issues.push(`badge check failed: ${e instanceof Error ? e.message : String(e)}`); }
-    const v = { badge, verified, owner, issues };
+    const v = { badge, verified, owner, track: await oracleTrack(), issues };
     // Cache failures briefly so a registry hiccup does not pin every trade to 'block' for ten minutes.
     oracleCache = { v, until: Date.now() + (verified ? 600_000 : 30_000) };
     return v;
@@ -184,9 +201,15 @@ export function createGuard(o: GuardOptions = {}): Guard {
 
   async function decide(mint: string, opts: CheckOptions): Promise<Decision> {
     const mode = opts.mode ?? 'auto';
-    const or = o.requireBadge === false ? { badge: null, verified: false, owner: null, issues: [] } : await oracle();
-    const d = base(mint, { badge: or.badge, verified: or.verified, owner: or.owner });
+    const or = o.requireBadge === false ? { badge: null, verified: false, owner: null, track: null, issues: [] } : await oracle();
+    const d = base(mint, { badge: or.badge, verified: or.verified, owner: or.owner, track: or.track });
     if (o.requireBadge !== false && !or.verified) return { ...d, source: 'oracle', reason: `oracle not verified: ${or.issues.join('; ')}` };
+    // A badge says who answers for the oracle; the graded record says whether it has been right. A policy can ask for both.
+    if (policy.minOracleSkill != null) {
+      const t = or.track ?? (await oracleTrack());
+      if (!t || t.graded < policy.minOracleGraded || t.skill == null || t.skill < policy.minOracleSkill)
+        return { ...d, oracle: { ...d.oracle, track: t }, source: 'oracle', reason: `oracle's graded record is below policy: ${t ? `${t.graded} graded at ${t.horizon}, skill ${t.skill ?? 'n/a'}` : 'no record published'} (needs ${policy.minOracleGraded}+ graded and skill ≥ ${policy.minOracleSkill})` };
+    }
 
     // 1. Free screen: authorities, holders, liquidity, market shape. Hard red flags block here without paying.
     let q: Quick | null = null;
@@ -232,13 +255,13 @@ export function createGuard(o: GuardOptions = {}): Guard {
 
   async function check(mint: string, opts: CheckOptions = {}): Promise<Decision> {
     mint = mint.trim();
-    if (!MINT_RE.test(mint)) return { ...base(mint, { badge: null, verified: false, owner: null }), reason: 'not a Solana mint address' };
+    if (!MINT_RE.test(mint)) return { ...base(mint, { badge: null, verified: false, owner: null, track: null }), reason: 'not a Solana mint address' };
     const key = `${mint}:${opts.mode ?? 'auto'}`;
     const hit = cache.get(key);
     if (hit && hit.until > Date.now()) return hit.d;
     let d: Decision;
     try { d = await decide(mint, opts); }
-    catch (e) { d = { ...base(mint, { badge: null, verified: false, owner: null }), reason: `guard error, failing closed: ${e instanceof Error ? e.message : String(e)}` }; }
+    catch (e) { d = { ...base(mint, { badge: null, verified: false, owner: null, track: null }), reason: `guard error, failing closed: ${e instanceof Error ? e.message : String(e)}` }; }
     // Never cache errors: the next attempt should try again.
     if (d.source !== 'error' && d.source !== 'oracle') cache.set(key, { d, until: Date.now() + cacheMs });
     if (cache.size > 1000) cache.delete(cache.keys().next().value!);
@@ -270,7 +293,7 @@ export function createGuard(o: GuardOptions = {}): Guard {
       const mint = mintOf(...args);
       const amount = opts.amountOf ? opts.amountOf(...args) : null;
       const limit = overLimit(amount);
-      if (limit) throw new GuardBlockedError({ ...base(mint, { badge: null, verified: false, owner: null }), source: 'mandate', reason: limit });
+      if (limit) throw new GuardBlockedError({ ...base(mint, { badge: null, verified: false, owner: null, track: null }), source: 'mandate', reason: limit });
       // Reserve the amount now, so concurrent buys cannot all fit under the same remaining limit; release it on any stop.
       const entry = { at: Date.now(), amount: amount ?? 0 };
       if (amount !== null) ledger.push(entry);
