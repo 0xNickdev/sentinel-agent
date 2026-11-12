@@ -8,7 +8,7 @@ export type Band = "SAFE" | "CAUTION" | "DANGER" | "RUGGED";
 export interface VerdictSummary { mint: string; verdict: Band; riskScore: number; confidence: number; at: number; digest: string; concordiumTx: string | null; storedAt: number | null; outcomes?: Array<{ horizon: number; rugged: boolean }> }
 
 /** How a token turned out after a verdict, graded at a fixed horizon with published labels. */
-export interface Outcome { horizon: number; at: number; labels: string[]; rugged: boolean; liquidityBps: number | null; priceBps: number | null; concordiumTx: string | null }
+export interface Outcome { horizon: number; at: number; rule?: number; void?: boolean; labels: string[]; rugged: boolean; liquidityBps: number | null; priceBps: number | null; concordiumTx: string | null }
 export interface ReliabilityBin { lo: number; hi: number; n: number; meanForecast: number | null; observed: number | null }
 export interface TrackSummary { n: number; brier: number | null; logScore: number | null; baseRate: number | null; baseBrier: number | null; skill: number | null; reliability: ReliabilityBin[]; confusion: { threshold: number; tp: number; fp: number; tn: number; fn: number; precision: number | null; recall: number | null; mcc: number | null } }
 /** The guarantee's own accounts, per asset in its smallest unit: what verdicts earned, what went back to buyers, what is still undecided. */
@@ -25,7 +25,10 @@ export interface TrackReport {
   rule?: number;
   superseded?: Array<{ rule: number; horizon: number; label: string; graded: number; judge: TrackSummary }>;
   weights?: { source: { source: "static" | "track"; horizon?: number; rule?: number; graded?: number }; agents: Record<string, LearnedWeight> };
-  horizons: Array<{ horizon: number; label: string; judge: TrackSummary; agents: Array<{ agent: string; summary: TrackSummary }>; graded: number }>;
+  /** the score-to-probability map the next verdict is sealed with; null while the track is too short to fit one */
+  calibration?: { a: number; b: number; n: number; horizon: number; rule: number } | null;
+  /** judge: the sealed probability scored; raw: the judge's score / 100 on the same calls; voided: grades on tokens that had nothing at stake, not scored */
+  horizons: Array<{ horizon: number; label: string; judge: TrackSummary; raw?: TrackSummary; agents: Array<{ agent: string; summary: TrackSummary }>; graded: number; voided?: number }>;
   verdicts: number; graded: number; pending: number;
   recent: Array<{ mint: string; digest: string; verdict: Band; riskScore: number; at: number; concordiumTx: string | null; outcomes: Outcome[] }>;
 }

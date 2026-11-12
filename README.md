@@ -145,7 +145,7 @@ The design follows what the literature says about multi-agent judgement. Debate 
 
 ## The track record
 
-A verdict's `riskScore / 100` is its forecast that the token rugs. The resolver grades every sealed verdict with the labels from [Catching the Rug (arXiv:2608.20271)](https://arxiv.org/abs/2608.20271):
+Every verdict seals a forecast, `probability.rug`: the chance the token is rugged a day later. It is the judge's score passed through a calibration fitted on the track (below); until the track can fit one it is `riskScore / 100`. The resolver grades every sealed verdict with the labels from [Catching the Rug (arXiv:2608.20271)](https://arxiv.org/abs/2608.20271):
 
 | Label | Meaning |
 |---|---|
@@ -156,9 +156,13 @@ A verdict's `riskScore / 100` is its forecast that the token rugs. The resolver 
 | `delisted` | listed when judged, dropped by the aggregator since |
 | `price_collapse` + `creator_exit` | the creator left and the price went with them |
 
-On a bonding curve the aggregator reports no pool, so liquidity there is the SOL buyers have put in, read from the curve price (`real SOL = 30 × (√(price / launch price) − 1)` on pump.fun). The first labelling rule did not do this: it read almost every priced curve token as `drained` and a token the aggregator had dropped as alive, which inflated the 1 h rug rate and deflated the 24 h one. Grades now carry the rule they were made under. The 142 one-hour and 102 one-day grades made under rule 1 stay on chain and stay listed, and the scores are computed from rule 2 grades only.
+On a bonding curve the aggregator reports no pool, so liquidity there is the SOL buyers have put in, read from the curve price (`real SOL = 30 × (√(price / launch price) − 1)` on pump.fun). The first labelling rule did not do this: it read almost every priced curve token as `drained` and a token the aggregator had dropped as alive, which inflated the 1 h rug rate and deflated the 24 h one. Grades now carry the rule they were made under. Rule 2 fixed that.
 
-Scores are strictly proper: Brier and log score reward honest probabilities, not confident ones. Skill is measured against the base rate, because a flat "90 % rug" guess already scores well on launchpad tokens. A **launch sampler** judges random live pump.fun launches on a fixed clock, so the track is not built only from tokens people chose to ask about.
+Rule 3 adds one requirement: something had to be at stake. Two launches in three are back at the curve floor within minutes of launching. Such a token cannot fall further, so rule 2 graded it alive when its price merely stayed at the floor, and a correct RUGGED call was scored as a miss: of the first 45 one-day grades, 8 were "alive" and most of those 8 were empty curves. A grade on a token with under $100 of exit liquidity at the verdict is now marked `void`: it is still recorded and anchored, and it is not scored. The sampler applies the same test at the draw, so it no longer spends a verdict on a token with nothing left to lose. Every grade made under rules 1 and 2 stays on chain and stays listed; the scores are computed from rule 3 grades only.
+
+**Calibration.** The judge's score orders tokens; a buyer needs a probability. Once 50 outcomes are graded at 24 h, with at least 10 of each kind, the score is mapped by Platt scaling, `logit(p) = a + b · logit(score)`, fitted on verdicts already graded and held at the identity by a ridge penalty while the history is short. The slope is never negative: calibration may flatten the judge's ordering, it may not reverse it. The fit is sealed in the verdict's digest together with the probability, so it never sees the outcome of the verdict it is used on. The track scores the sealed probability and shows the raw score's Brier beside it ([`scoring.ts`](engine/src/scoring.ts), `SENTINEL_CALIBRATION=0` turns it off).
+
+Scores are strictly proper: Brier and log score reward honest probabilities, not confident ones. Skill is measured against the base rate, because a flat "90 % rug" guess already scores well on launchpad tokens. A **launch sampler** judges random live pump.fun launches that still hold buyers' money, on a fixed clock, so the track is not built only from tokens people chose to ask about.
 
 Live: [sentinelagent.pro/track](https://sentinelagent.pro/track) · `GET https://api.sentinelagent.pro/track` · MCP tool `sentinel_track`.
 
@@ -263,6 +267,19 @@ const guard = createGuard({ pay: concordiumPayer({ address, privateKeyHex }), ma
 const d = await guard.check(mint);   // allow | warn | block, with the reason and the audit link
 ```
 
+### Built for Protocol-Level Locks
+
+Today the only hard limit on a Concordium agent's spending is its account balance. Concordium's roadmap adds Protocol-Level Locks (Simple Locks in January 2027, Enhanced Locks in March 2027): the owner fixes who may be paid, in which token, how much in total and until when, and the chain enforces it. Sentinel already works in those terms in two places on Concordium, so each becomes a lock without a redesign:
+
+| Today, enforced in code | As a lock |
+|---|---|
+| What an agent may spend on verdicts: Guard pays the gateway, never above `maxPriceCcd` per call | recipient = `pay_to`, token = CCD or EUDemo, amount = the agent's verdict budget, expiry set by the owner |
+| The guarantee pool: an account that refunds a paid SAFE that rugs within 24 h | amount = the pool, token = the asset the verdict was paid in, recipients = the payers on record |
+
+Guard's trade mandate (`maxPerTrade`, `maxPerDay`, `expiresAt`) has the same shape, but it bounds swaps on Solana, where a Concordium lock does not reach; it stays in code.
+
+The second row matters more. A refund promise backed by an account is a promise; backed by a lock the buyer can read on chain before paying, it is collateral.
+
 An agent that asks before it buys:
 
 ```bash
@@ -325,11 +342,12 @@ Prompt-injection guards treat every on-chain string as data. Inputs are validate
 
 - The badge proves that a verified person is accountable for the agents. It does not prove that a verdict is right; the track record is how you judge that.
 - A verdict below CAUTION needs observation: a token nobody has traded, or one still on its bonding curve and under a day old, cannot be called SAFE, whatever the specialists found or did not find. The sampler therefore spends half its draws on survivors, tokens it judged before that were graded alive and still trade, so the track holds calls with both outcomes.
-- Weights learned from the track move the swarm's mean toward the specialists that have been right; they do not make that mean a calibrated probability. The sampler judges launches minutes old, nearly all of which are dead within days, and a specialist that finds nothing in its own domain still scores the token low. A calibration map fitted on rule 2 grades is the next step.
+- The track has been restarted twice, each time because the grading was wrong and we said so on the page: rule 1 misread bonding curves, rule 2 scored tokens that had nothing left to lose. Under rule 2 the judge scored worse than the base rate (skill −0.23 on 45 one-day grades). Rule 3 scores start from zero, and the number may again be unflattering.
+- Calibration makes the sealed probability honest on average; it cannot add information the judge's score does not carry. If the score does not separate tokens that survive from tokens that die, the fitted slope goes to zero, every verdict gets the base rate, and skill is zero, not positive. Telling survivors apart needs features the swarm does not read yet (the first minutes of the trade tape).
 - Creator proofs work end to end with the Concordium Wallet for Web. The Concordium ID App pairs and receives the request, but does not return a proof yet; we are working it through with Concordium.
 - A verified creator is accountable, not automatically honest; a creator planning a rug will not verify.
 - Phantom cannot sign CIS-8 proofs yet (see [Bugs we found in Concordium's tooling](#bugs-we-found-in-concordiums-tooling)); bind a Solana key with the Solana CLI or a programmatic key.
-- The guarantee pool is an ordinary account Sentinel funds, not escrow: Protocol-Level Locks, which would hold it on-chain, are not on testnet yet. PLT payments use EUDemo, Concordium's allow-listed test token: payer and pool must both be on its allow list, which takes an EU-nationality proof at the faucet. The PLT refund path is tested with a direct transfer; an automatic EUDemo refund has not fired yet, because no EUDemo-paid SAFE has rugged. USDR is live on testnet but has no public faucet.
+- The guarantee pool is an ordinary account Sentinel funds, not escrow, and Guard's price ceiling is enforced in the agent's own process, not by the chain. Protocol-Level Locks would hold both on-chain; they are not on testnet yet (see [Built for Protocol-Level Locks](#built-for-protocol-level-locks)). PLT payments use EUDemo, Concordium's allow-listed test token: payer and pool must both be on its allow list, which takes an EU-nationality proof at the faucet. The PLT refund path is tested with a direct transfer; an automatic EUDemo refund has not fired yet, because no EUDemo-paid SAFE has rugged. USDR is live on testnet but has no public faucet.
 - Everything runs on Concordium testnet.
 
 ## Research

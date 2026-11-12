@@ -13,12 +13,19 @@
 // TVL and drained labels are now read from that, and a token that vanished
 // from the aggregator is labelled as such. Grades carry the rule they were
 // made under and the track scores one rule at a time.
+//
+// Rule 3 (something at stake). A forecast needs an outcome that can go either
+// way. Two thirds of sampled launches had no buyers' money left in the curve
+// when they were judged: such a token cannot fall further, so rule 2 graded it
+// "alive" when its price merely stayed at the floor, and a correct RUGGED call
+// was scored as a miss. A grade on a token with nothing at stake at the verdict
+// is now marked void: it is still recorded and anchored, and it is not scored.
 
 export const HORIZONS = { h1: 3_600, d1: 86_400, d7: 604_800 } as const;
 export type HorizonKey = keyof typeof HORIZONS;
 
 /** Version of the labelling rule a grade was made under. */
-export const OUTCOME_RULE = 2;
+export const OUTCOME_RULE = 3;
 
 /** pump.fun's constant-product curve: 30 virtual SOL against 1.073bn virtual tokens at launch. */
 export const PUMP_CURVE = { venue: 'pumpfun', virtualSol: 30, floorPriceSol: 30 / 1_073_000_000 } as const;
@@ -74,6 +81,8 @@ export interface Outcome {
   /** labelling rule the grade was made under; absent on grades made before rules were versioned (rule 1) */
   rule?: number;
   labels: OutcomeLabel[];
+  /** nothing was at stake when the verdict was sealed (no exit liquidity to lose): recorded, not scored */
+  void?: boolean;
   /** the binary ground truth the verdict is scored against: TVL rug, idle, drained, an emptied curve, delisted, or the creator left and the price went with them */
   rugged: boolean;
   /** liquidity now as basis points of liquidity then; null when then was unknown */
@@ -100,6 +109,12 @@ export function curveLiquidityUsd(p: MarketPoint): number | null {
 /** Liquidity a holder can actually exit into: the pool on an AMM, the buyers' SOL on a curve (unknown there unless the price reads). */
 const exitLiquidityUsd = (p: MarketPoint): number | null => (p.onCurve ? curveLiquidityUsd(p) : p.liquidityUsd);
 
+/** What a holder stands to lose at this point, in USD of exit liquidity; null when it cannot be read. */
+export const stakeUsd = (p: MarketPoint): number | null => exitLiquidityUsd(p);
+
+/** There is something to lose: readable exit liquidity above the "gone" line. Sampling and scoring both use this one test. */
+export const hasStake = (p: MarketPoint): boolean => (exitLiquidityUsd(p) ?? 0) > OUTCOME.goneLiquidityUsd;
+
 export function gradeOutcome(input: OutcomeInput, horizon: number): Outcome {
   const { then, now } = input;
   const labels: OutcomeLabel[] = [];
@@ -123,7 +138,7 @@ export function gradeOutcome(input: OutcomeInput, horizon: number): Outcome {
   const c = input.creator;
   if (c && (c.soldPct ?? 0) >= OUTCOME.creatorExitSoldPct && (c.holdingPct ?? 100) < OUTCOME.creatorExitHeldPct) labels.push('creator_exit');
   const rugged = labels.includes('tvl_rug') || labels.includes('idle') || labels.includes('drained') || labels.includes('curve_empty') || labels.includes('delisted') || (labels.includes('creator_exit') && labels.includes('price_collapse'));
-  return { horizon, at, rule: OUTCOME_RULE, labels, rugged, liquidityBps, priceBps };
+  return { horizon, at, rule: OUTCOME_RULE, labels, ...(hadLiquidity ? {} : { void: true }), rugged, liquidityBps, priceBps };
 }
 
 export const horizonLabel = (seconds: number): string => (Object.entries(HORIZONS).find(([, s]) => s === seconds)?.[0] ?? `${seconds}s`);

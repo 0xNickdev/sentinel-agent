@@ -195,4 +195,16 @@ describe('runSwarm', () => {
     expect(learned.findings.find(f => f.agent === 'holders')!.weight).toBe(0.95);   // not named: the prior stands
     expect(learned.consensus.weightedScore).toBeGreaterThan(plain.consensus.weightedScore);
   });
+
+  it('seals a probability with every verdict: the raw score, or the score through the calibration it was given', async () => {
+    const scores = { holders: 10, snipers: 10, funding: 10, creator: 10, contract: 10, market: 40, flows: 10 };
+    const run = (calibration?: Parameters<typeof judgeToken>[1]['calibration']) => judgeToken(cleanToken(), { llm: fakeLLM(scores, { verdict: 'SAFE', riskScore: 20 }), models, effort, advocate: false, council: false, ...(calibration ? { calibration } : {}) });
+    const plain = await run();
+    expect(plain.probability).toEqual({ rug: plain.riskScore / 100, horizon: 86_400, calibration: { source: 'none' } });
+    const mapped = await run({ a: 1, b: 0.5, n: 80, rule: 3, horizon: 86_400 });
+    expect(mapped.riskScore).toBe(plain.riskScore);                    // the judge's score is not touched
+    expect(mapped.probability!.calibration).toEqual({ source: 'track', a: 1, b: 0.5, n: 80, rule: 3 });
+    expect(mapped.probability!.rug).toBeGreaterThan(plain.probability!.rug);
+    expect(mapped.attestation.digest).not.toBe(plain.attestation.digest);   // the probability is part of what is sealed
+  });
 });

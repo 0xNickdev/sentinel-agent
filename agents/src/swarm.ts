@@ -2,13 +2,13 @@
 // progress, apply the consensus rule, run one debate round when they
 // disagree, let the judge speak, reconcile, hash. Returns an async generator
 // so callers (CLI, MCP server, web UI) see the swarm work in real time.
-import { analyze, verdictDigest, type Evidence, type TokenSnapshot } from '@sentinel/engine';
+import { HORIZONS, analyze, calibrate, verdictDigest, type Evidence, type TokenSnapshot } from '@sentinel/engine';
 import { ALL_AGENTS, agentWeight, aggregate, detectVetoes, observation, pickDebaters, reconcile } from './consensus.js';
 import { COUNCIL_RANKING_SCHEMA, COUNCIL_SYSTEM, councilBrief, councilScores, decodeRanking, pooled } from './council.js';
 import { modelConfig } from './env.js';
 import { ADVOCATE_SYSTEM, JUDGE_SYSTEM, advocateUserMessage, judgeUserMessage } from './judge.js';
 import type { LLM } from './llm.js';
-import { AdvocateOutputSchema, FindingSchema, JudgeOutputSchema, type AdvocateOutput, type AgentFinding, type AgentId, type CouncilRanking, type Effort, type SwarmEvent, type TimelineEntry, type Verdict, type WeightsSource } from './schema.js';
+import { AdvocateOutputSchema, FindingSchema, JudgeOutputSchema, type AdvocateOutput, type AgentFinding, type AgentId, type CouncilRanking, type Effort, type SwarmEvent, type TimelineEntry, type Verdict, type VerdictProbability, type WeightsSource } from './schema.js';
 import { SPECIALISTS, debateUserMessage, specialistSystemPrompt, specialistUserMessage, type Specialist } from './specialists.js';
 
 export const ENGINE_VERSION = '@sentinel/engine@0.1.0';
@@ -29,6 +29,8 @@ export interface SwarmOptions {
   registry?: Partial<Record<AgentId | 'judge', string>>;
   /** reliability weights learned from the graded track; agents not named keep their prior */
   weights?: { byAgent: Partial<Record<AgentId, number>>; source: WeightsSource };
+  /** the map from the judge's score to a probability, fitted on the graded track; absent means score / 100 */
+  calibration?: { a: number; b: number; n: number; rule: number; horizon: number };
   signal?: AbortSignal;
 }
 
@@ -236,8 +238,13 @@ export async function* runSwarm(snapshot: TokenSnapshot, opts: SwarmOptions): As
 
   // ── Record ─────────────────────────────────────────────────────────────
   const modelsUsed = { specialist: models.specialist, judge: judged.model, engine: ENGINE_VERSION };
+  const cal = opts.calibration;
+  const probability: VerdictProbability = {
+    rug: calibrate(final.riskScore / 100, cal ?? null), horizon: cal?.horizon ?? HORIZONS.d1,
+    calibration: cal ? { source: 'track', a: cal.a, b: cal.b, n: cal.n, rule: cal.rule } : { source: 'none' },
+  };
   const attested = {
-    verdict: final.verdict, riskScore: final.riskScore, confidence: final.confidence, headline: judged.value.headline, decisive: judged.value.decisive, reasoning: judged.value.reasoning, topReasons: final.topReasons, action: judged.value.action,
+    verdict: final.verdict, riskScore: final.riskScore, probability, confidence: final.confidence, headline: judged.value.headline, decisive: judged.value.decisive, reasoning: judged.value.reasoning, topReasons: final.topReasons, action: judged.value.action,
     vetoes: vetoes.map(v => v.code),
     findings: findings.map(f => ({ agent: f.agent, agentRegistryId: f.agentRegistryId, riskScore: f.riskScore, confidence: f.confidence, label: f.label, summary: f.summary })),
     consensus: { rule: consensus.rule, weightedScore: consensus.weightedScore, spread: consensus.spread, debateRounds: consensus.debateRounds },
@@ -246,7 +253,7 @@ export async function* runSwarm(snapshot: TokenSnapshot, opts: SwarmOptions): As
   };
   const verdict: Verdict = {
     schema: 'sentinel.verdict/1', chain: snapshot.chain, mint: snapshot.mint, at: snapshot.at,
-    verdict: final.verdict, riskScore: final.riskScore, confidence: final.confidence,
+    verdict: final.verdict, riskScore: final.riskScore, probability, confidence: final.confidence,
     headline: judged.value.headline, decisive: judged.value.decisive, reasoning: judged.value.reasoning, topReasons: final.topReasons,
     cleanSignals: judged.value.cleanSignals.slice(0, 3), whatWouldChange: judged.value.whatWouldChange.slice(0, 2), action: judged.value.action,
     scorecard, dissent: judged.value.dissent, advocate, rebuttal: advocate ? judged.value.rebuttal : null,

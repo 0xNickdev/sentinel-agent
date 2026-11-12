@@ -1,7 +1,7 @@
 import { analyze, HORIZONS, OUTCOME_RULE, type MarketData } from '@sentinel/engine';
 import { cleanToken, rugToken } from '@sentinel/agents';
 import { describe, expect, it } from 'vitest';
-import { Resolver, VerdictService, learnedWeights, marketThen, trackReport, type StoredVerdict } from '../src/index.js';
+import { Resolver, VerdictService, learnedCalibration, learnedWeights, marketThen, scoredCalls, trackReport, type StoredVerdict } from '../src/index.js';
 
 const market = (mint: string, liquidityUsd: number, priceUsd: number, txns24h = 500): MarketData => ({
   source: 'dexscreener', symbol: 'X', name: 'X', priceUsd, liquidityUsd, fdvUsd: liquidityUsd * 10, volume24hUsd: 1000, txns24h, priceChangePct: { h1: 0, h6: 0, h24: 0 }, pairs: 1, topVenue: 'raydium', venues: ['raydium'], oldestPairAt: 1_700_000_000, onCurve: false,
@@ -91,5 +91,34 @@ describe('resolver', () => {
     expect(report.horizons.find(h => h.horizon === HORIZONS.d1)!.graded).toBe(40);
     expect(report.superseded).toMatchObject([{ rule: 1, horizon: HORIZONS.d1, label: '24h', graded: 20 }]);
     expect(report.weights.source.source).toBe('track');
+  });
+
+  it('leaves void grades out of the score, and seals a calibrated probability once the track can fit one', () => {
+    const t0 = 1_700_000_000;
+    const grade = (v: StoredVerdict, rugged: boolean, extra: object = {}) => { v.outcomes = [{ horizon: HORIZONS.d1, at: t0 + HORIZONS.d1, rule: OUTCOME_RULE, labels: [], rugged, liquidityBps: null, priceBps: null, concordiumTx: null, ...extra }]; return v; };
+    // An overconfident judge: says 85, and three in five of those die; says 30, and one in five do.
+    const graded = Array.from({ length: 100 }, (_, i) => (i % 2
+      ? grade(stored(`H${i}`.padEnd(32, 'x'), 85, t0 + i, 50_000, 0.01, [['market', 85]]), i % 10 < 6)
+      : grade(stored(`L${i}`.padEnd(32, 'x'), 30, t0 + i, 50_000, 0.01, [['market', 30]]), i % 10 < 2)));
+    const voids = Array.from({ length: 30 }, (_, i) => grade(stored(`V${i}`.padEnd(32, 'x'), 90, t0 + i, 50_000, 0.01, [['market', 90]]), false, { void: true }));
+
+    const calls = scoredCalls([...graded, ...voids], HORIZONS.d1);
+    expect(calls.judge).toHaveLength(100);
+    expect(calls.voided).toBe(30);
+    expect(calls.agents.get('market')).toHaveLength(100);
+
+    expect(learnedCalibration(graded.slice(0, 40))).toBeNull();
+    const c = learnedCalibration([...graded, ...voids])!;
+    expect(c).toMatchObject({ n: 100, horizon: HORIZONS.d1, rule: OUTCOME_RULE });
+    expect(c.b).toBeLessThan(1);
+
+    // A verdict sealed with a probability is scored on it; the raw score is reported beside it.
+    const sealed = graded.map(v => ({ ...v, probability: { rug: v.riskScore === 85 ? 0.6 : 0.2, horizon: HORIZONS.d1, calibration: { source: 'track' as const, a: c.a, b: c.b, n: c.n, rule: c.rule } } }));
+    const report = trackReport([...sealed, ...voids]);
+    const day = report.horizons.find(h => h.horizon === HORIZONS.d1)!;
+    expect(day).toMatchObject({ graded: 100, voided: 30 });
+    expect(day.judge.brier!).toBeLessThan(day.raw.brier!);
+    expect(day.judge.skill!).toBeGreaterThan(0);
+    expect(report.calibration).toMatchObject({ n: 100 });
   });
 });

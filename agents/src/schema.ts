@@ -102,6 +102,14 @@ export interface ConsensusResult {
   weights?: WeightsSource;
 }
 
+export interface VerdictProbability {
+  rug: number;
+  /** seconds after the verdict the probability speaks about */
+  horizon: number;
+  /** none: the raw score / 100. track: Platt scaling fitted on `n` verdicts graded under `rule` before this one */
+  calibration: { source: 'none' } | { source: 'track'; a: number; b: number; n: number; rule: number };
+}
+
 export interface WeightsSource {
   source: 'static' | 'track';
   /** track only: the horizon the outcomes were graded at, the labelling rule, and how many graded verdicts stood behind the weights */
@@ -139,6 +147,8 @@ export interface Verdict {
   at: number;
   verdict: VerdictBand;
   riskScore: number;
+  /** the forecast the track scores: P(rugged at the horizon), the judge's score passed through the calibration sealed beside it */
+  probability?: VerdictProbability;
   confidence: number;
   headline: string;
   decisive: string;

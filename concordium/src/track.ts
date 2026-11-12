@@ -5,7 +5,7 @@
 // the accountability the registry badge does not carry: not "we are verified",
 // but "here is every call we made, and here is how it turned out".
 import { AGENT_WEIGHTS, type AgentId, type WeightsSource } from '@sentinel/agents';
-import { HORIZONS, OUTCOME_RULE, fetchMarket, gradeOutcome, trackSummary, trackWeights, type LearnedWeight, type MarketData, type MarketPoint, type ScoredCall, type TrackSummary } from '@sentinel/engine';
+import { HORIZONS, OUTCOME_RULE, fetchMarket, fitCalibration, gradeOutcome, trackSummary, trackWeights, type Calibration, type LearnedWeight, type MarketData, type MarketPoint, type ScoredCall, type TrackSummary } from '@sentinel/engine';
 import type { AuditClient } from './audit.js';
 import { toBps } from './audit.js';
 import type { Account } from './chain.js';
@@ -88,7 +88,7 @@ export class Resolver {
           }
           if (this.o.service.attachOutcome(v.attestation.digest, outcome)) {
             made.push({ digest: v.attestation.digest, outcome });
-            this.o.log?.(`resolve · ${v.mint.slice(0, 6)} · ${v.verdict} ${v.riskScore} → ${graded.rugged ? 'RUGGED' : 'alive'} at +${h}s [${graded.labels.join(', ') || 'no labels'}]${outcome.concordiumTx ? ' · anchored' : ''}`);
+            this.o.log?.(`resolve · ${v.mint.slice(0, 6)} · ${v.verdict} ${v.riskScore} → ${graded.void ? 'void (nothing at stake)' : graded.rugged ? 'RUGGED' : 'alive'} at +${h}s [${graded.labels.join(', ') || 'no labels'}]${outcome.concordiumTx ? ' · anchored' : ''}`);
           }
         }
       }
@@ -114,7 +114,10 @@ export interface TrackReport {
   superseded: Array<{ rule: number; horizon: number; label: string; graded: number; judge: TrackSummary }>;
   /** the reliability weights the consensus rule is using now, and what the track says about each agent */
   weights: { source: WeightsSource; agents: Record<AgentId, LearnedWeight> };
-  horizons: Array<{ horizon: number; label: string; judge: TrackSummary; agents: Array<{ agent: string; summary: TrackSummary }>; graded: number }>;
+  /** the map from the judge's score to the sealed probability that the next verdict will carry; null while the track is too short */
+  calibration: (Calibration & { horizon: number; rule: number }) | null;
+  /** `judge` scores the sealed probability; `raw` scores the judge's score / 100 on the same calls; `voided` counts grades on tokens with nothing at stake, which are not scored */
+  horizons: Array<{ horizon: number; label: string; judge: TrackSummary; raw: TrackSummary; agents: Array<{ agent: string; summary: TrackSummary }>; graded: number; voided: number }>;
   verdicts: number;
   graded: number;
   pending: number;
@@ -125,18 +128,25 @@ const label = (h: number) => (h === HORIZONS.h1 ? '1h' : h === HORIZONS.d1 ? '24
 
 const ruleOf = (o: StoredOutcome) => o.rule ?? 1;
 
-/** Sealed scores against graded outcomes at one horizon, under one labelling rule: the judge's and each specialist's. */
-export function scoredCalls(verdicts: StoredVerdict[], horizon: number, rule: number = OUTCOME_RULE): { judge: ScoredCall[]; agents: Map<string, ScoredCall[]> } {
-  const judge: ScoredCall[] = [];
+/**
+ * Sealed forecasts against graded outcomes at one horizon, under one labelling rule: the judge's and each specialist's.
+ * `judge` is the probability sealed in the verdict (the score / 100 on verdicts sealed before calibration), `raw` the
+ * judge's score / 100 on the same calls. Void grades (nothing at stake at the verdict) are counted and left out.
+ */
+export function scoredCalls(verdicts: StoredVerdict[], horizon: number, rule: number = OUTCOME_RULE): { judge: ScoredCall[]; raw: ScoredCall[]; agents: Map<string, ScoredCall[]>; voided: number } {
+  const judge: ScoredCall[] = [], raw: ScoredCall[] = [];
   const agents = new Map<string, ScoredCall[]>();
+  let voided = 0;
   for (const v of verdicts) {
     const o = v.outcomes?.find(x => x.horizon === horizon && ruleOf(x) === rule);
     if (!o) continue;
+    if (o.void) { voided++; continue; }
     const y = o.rugged ? 1 : 0;
-    judge.push({ p: v.riskScore / 100, y });
+    judge.push({ p: v.probability?.rug ?? v.riskScore / 100, y });
+    raw.push({ p: v.riskScore / 100, y });
     for (const f of v.findings) { const list = agents.get(f.agent) ?? []; list.push({ p: f.riskScore / 100, y }); agents.set(f.agent, list); }
   }
-  return { judge, agents };
+  return { judge, raw, agents, voided };
 }
 
 /** The horizon the weights are learned at: one day, the horizon the guarantee is written against. */
@@ -154,11 +164,20 @@ export function learnedWeights(verdicts: StoredVerdict[], horizon: number = WEIG
   return { byAgent, agents: learned, source: moved ? { source: 'track', horizon, rule: OUTCOME_RULE, graded: judge.length } : { source: 'static' } };
 }
 
-/** Score the whole history: judge and each specialist, per horizon. riskScore/100 is P(rug). */
+/**
+ * The calibration the next verdict will be sealed with: Platt scaling of the judge's raw score, fitted on every verdict
+ * already graded at the guarantee's horizon under the current rule. Null until the track is long enough.
+ */
+export function learnedCalibration(verdicts: StoredVerdict[], horizon: number = WEIGHTS_HORIZON): (Calibration & { horizon: number; rule: number }) | null {
+  const fit = fitCalibration(scoredCalls(verdicts, horizon).raw);
+  return fit ? { ...fit, horizon, rule: OUTCOME_RULE } : null;
+}
+
+/** Score the whole history: judge and each specialist, per horizon. */
 export function trackReport(verdicts: StoredVerdict[], horizons: number[] = DEFAULT_HORIZONS, recentLimit = 50): TrackReport {
   const perHorizon = horizons.map(h => {
-    const { judge, agents } = scoredCalls(verdicts, h);
-    return { horizon: h, label: label(h), judge: trackSummary(judge), agents: [...agents.entries()].map(([agent, xs]) => ({ agent, summary: trackSummary(xs) })).sort((a, b) => (a.summary.brier ?? 1) - (b.summary.brier ?? 1)), graded: judge.length };
+    const { judge, raw, agents, voided } = scoredCalls(verdicts, h);
+    return { horizon: h, label: label(h), judge: trackSummary(judge), raw: trackSummary(raw), voided, agents: [...agents.entries()].map(([agent, xs]) => ({ agent, summary: trackSummary(xs) })).sort((a, b) => (a.summary.brier ?? 1) - (b.summary.brier ?? 1)), graded: judge.length };
   });
   const olderRules = [...new Set(verdicts.flatMap(v => (v.outcomes ?? []).map(ruleOf)))].filter(r => r !== OUTCOME_RULE).sort((a, b) => b - a);
   const superseded = olderRules.flatMap(rule => horizons.map(h => { const { judge } = scoredCalls(verdicts, h, rule); return { rule, horizon: h, label: label(h), graded: judge.length, judge: trackSummary(judge) }; })).filter(x => x.graded > 0);
@@ -168,6 +187,7 @@ export function trackReport(verdicts: StoredVerdict[], horizons: number[] = DEFA
     rule: OUTCOME_RULE,
     superseded,
     weights: { source, agents: weightAgents },
+    calibration: learnedCalibration(verdicts),
     horizons: perHorizon,
     verdicts: verdicts.length,
     graded,

@@ -9,7 +9,7 @@ import type { AuditClient } from './audit.js';
 import type { Account } from './chain.js';
 import { explorerTx } from './chain.js';
 import type { Network } from './registry.js';
-import { learnedWeights } from './track.js';
+import { learnedCalibration, learnedWeights } from './track.js';
 
 export interface VerdictServiceOptions {
   rpcUrl: string;
@@ -191,7 +191,7 @@ export class VerdictService {
     // A proof can arrive after the snapshot was cached, so it is looked up per verdict, never cached with the chain data.
     const proof = this.o.creatorProofs?.get(base.creator) ?? null;
     const snapshot = proof ? { ...base, creatorProof: { wallet: proof.wallet, claims: proof.claims, verifiedAt: proof.verifiedAt, requestTx: proof.requestTx, auditTx: proof.auditTx } } : base;
-    const v = await judgeToken(snapshot, { llm: this.llm, ...this.trackWeights(), ...(this.o.audit ? { registry: Object.fromEntries(this.o.audit.agentIds.map((id, i) => [['holders', 'snipers', 'funding', 'creator', 'contract', 'market', 'judge'][i] ?? `agent${i}`, String(id)])) } : {}) }, onEvent);
+    const v = await judgeToken(snapshot, { llm: this.llm, ...this.trackWeights(), ...this.trackCalibration(), ...(this.o.audit ? { registry: Object.fromEntries(this.o.audit.agentIds.map((id, i) => [['holders', 'snipers', 'funding', 'creator', 'contract', 'market', 'judge'][i] ?? `agent${i}`, String(id)])) } : {}) }, onEvent);
     let auditSeq: number | null = null, auditExplorer: string | null = null;
     if (this.o.audit) {
       try {
@@ -223,6 +223,13 @@ export class VerdictService {
     if (process.env.SENTINEL_TRACK_WEIGHTS === '0') return {};
     const { byAgent, source } = learnedWeights(this.all());
     return source.source === 'track' ? { weights: { byAgent, source } } : {};
+  }
+
+  /** The score-to-probability map for the next verdict, fitted on the graded track; SENTINEL_CALIBRATION=0 seals the raw score / 100. */
+  private trackCalibration(): Pick<SwarmOptions, 'calibration'> {
+    if (process.env.SENTINEL_CALIBRATION === '0') return {};
+    const c = learnedCalibration(this.all());
+    return c ? { calibration: c } : {};
   }
 
   /** Attach an outcome grade to a verdict (one per horizon) and persist it. Returns false when the digest is unknown or the horizon is already graded. */

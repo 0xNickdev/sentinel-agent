@@ -60,6 +60,8 @@ await buy(mint, 0.7);   // GuardBlockedError: buy of 0.7 is over the per-trade l
 
 Limits are checked before the token, so an over-limit buy never costs a verdict. The amount is reserved before the check, so concurrent buys cannot all slip under the same remaining limit; a blocked or failed buy releases it. `onlyBands` refuses buys backed only by the free screen. `guard.spent()` reports the rolling 24 h total.
 
+The mandate bounds what the bot buys on Solana and is enforced in the agent's own process. What the agent spends on Concordium (verdicts, capped per call by `maxPriceCcd` and paid to the gateway) is the part Protocol-Level Locks will be able to enforce on chain: Simple Locks, planned for January 2027, fix the recipient, the token, the total and the expiry.
+
 ## Guarantee
 
 When the guard pays for a verdict that the gateway's guarantee covers, the decision says so (`d.guarantee`): a paid SAFE on a token that rugs within 24 h is refunded to the paying account automatically. Terms and every claim: [`/guarantee`](https://api.sentinelagent.pro/guarantee).

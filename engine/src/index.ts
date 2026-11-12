@@ -6,5 +6,5 @@ export { fetchMarket, marketFromPairs, liquidityFromMarket } from './solana/dexs
 export { exchangeOf, knownExchangeCount } from './solana/exchanges.js';
 export { LaunchFeed, PUMP_FUN_PROGRAM, decodePumpCreate, launchesFromUpdate, type LaunchEvent, type LaunchFeedOptions } from './solana/geyser.js';
 export { traceOutflows, summarizeFlows, heliusKeyFrom, FLOW_DEFAULTS, type OutflowOptions, type TraceWallet } from './solana/outflows.js';
-export { gradeOutcome, curveLiquidityUsd, horizonLabel, HORIZONS, OUTCOME, OUTCOME_RULE, PUMP_CURVE, type Outcome, type OutcomeInput, type OutcomeLabel, type MarketPoint, type HorizonKey } from './outcome.js';
-export { brier, logScore, reliability, confusion, trackSummary, trackWeights, TRACK_WEIGHTS, type LearnedWeight, type ScoredCall, type TrackSummary, type ReliabilityBin, type Confusion } from './scoring.js';
+export { gradeOutcome, curveLiquidityUsd, stakeUsd, hasStake, horizonLabel, HORIZONS, OUTCOME, OUTCOME_RULE, PUMP_CURVE, type Outcome, type OutcomeInput, type OutcomeLabel, type MarketPoint, type HorizonKey } from './outcome.js';
+export { brier, logScore, reliability, confusion, trackSummary, trackWeights, TRACK_WEIGHTS, calibrate, fitCalibration, CALIBRATION, type Calibration, type LearnedWeight, type ScoredCall, type TrackSummary, type ReliabilityBin, type Confusion } from './scoring.js';

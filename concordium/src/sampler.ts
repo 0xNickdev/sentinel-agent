@@ -1,9 +1,12 @@
 // The launch sampler feeds the track. A track record is only as honest as its
 // sample: verdicts asked for by users skew to tokens that already look bad or
 // famous. The sampler judges launches drawn from the live pump.fun feed on a
-// fixed clock, a few minutes after they appear (so there is trading to read),
-// with no filter on how they look. Those verdicts are sealed and later graded
-// like any other, which gives the track an unbiased stream of calls.
+// fixed clock, a few minutes after they appear (so there is trading to read).
+// One filter applies, and it looks only at the moment of the draw: buyers'
+// money must still be in the token. Two launches in three are back at the
+// curve floor within minutes; a call on a token with nothing left to lose has
+// no outcome to forecast, costs model tokens, and is void on the track. Those
+// verdicts are sealed and later graded like any other.
 //
 // Launches alone teach the track little: nearly all of them are dead within a
 // day, so every call has the same outcome. Half the draws therefore go to
@@ -13,8 +16,9 @@
 // when the draw is made, never at how the token turns out.
 // Every run costs model tokens, so it is off unless SENTINEL_SAMPLER_EVERY_MIN
 // is set, and a daily cap bounds the spend.
-import { fetchMarket, type LaunchEvent, type MarketData } from '@sentinel/engine';
+import { fetchMarket, hasStake, type LaunchEvent, type MarketData } from '@sentinel/engine';
 import type { StoredVerdict, VerdictService } from './service.js';
+import { marketNow } from './track.js';
 
 export interface SamplerOptions {
   service: VerdictService;
@@ -32,6 +36,8 @@ export interface SamplerOptions {
   survivorMinGapSec?: number;
   /** verdicts one token can collect in total (default 3) */
   maxVerdictsPerMint?: number;
+  /** launches read per draw while looking for one with a stake (default 8) */
+  stakeTries?: number;
   fetchMarket?: (mint: string) => Promise<MarketData | null>;
   random?: () => number;
   now?: () => number;
@@ -90,8 +96,21 @@ export class LaunchSampler {
       const [v] = pool.splice(Math.floor(random() * pool.length), 1);
       let m: MarketData | null;
       try { m = await read(v!.mint); } catch { continue; }
-      if (m && m.priceUsd != null && m.txns24h > 0) return v!;
+      if (m && m.priceUsd != null && m.txns24h > 0 && hasStake(marketNow(m, now))) return v!;
       this.gone.add(v!.mint);
+    }
+    return null;
+  }
+
+  /** A uniformly random eligible launch that still has buyers' money in it. Launches found empty are not read again. */
+  private async pickStaked(pool: LaunchEvent[], now: number, random: () => number): Promise<LaunchEvent | null> {
+    const read = this.o.fetchMarket ?? (m => fetchMarket(m));
+    for (let tries = 0; tries < (this.o.stakeTries ?? 8) && pool.length; tries++) {
+      const [l] = pool.splice(Math.floor(random() * pool.length), 1);
+      let m: MarketData | null;
+      try { m = await read(l!.mint); } catch { continue; }
+      if (m && hasStake(marketNow(m, now))) return l!;
+      this.judged.add(l!.mint);
     }
     return null;
   }
@@ -121,8 +140,9 @@ export class LaunchSampler {
     }
     const pool = this.candidates(now);
     if (!pool.length) { this.o.log?.(`sample · nothing eligible (${this.seen.size} launches seen in the last ${Math.round((this.o.maxAgeSec ?? 1800) / 60)} min)`); return null; }
-    const pick = pool[Math.floor(random() * pool.length)]!;
     this.busy = true;
+    const pick = await this.pickStaked(pool, now, random);
+    if (!pick) { this.busy = false; this.o.log?.(`sample · no launch with a stake among ${Math.min(pool.length, this.o.stakeTries ?? 8)} read (${pool.length} eligible)`); return null; }
     this.judged.add(pick.mint);
     this.today++;
     try {

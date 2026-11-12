@@ -27,7 +27,7 @@ export function TrackView() {
     <div className="mx-auto max-w-7xl px-4 py-12">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div><div className="display text-red text-sm">TRACK RECORD</div><h1 className="display text-[clamp(40px,7vw,96px)]">WAS IT RIGHT?</h1></div>
-        <p className="text-fg-2 max-w-md">Every verdict is sealed on Concordium before the outcome and graded after it. <span className="mono text-fg">riskScore/100</span> is the forecast P(rug); a rug is liquidity down more than 99%, no trades left, the labels of arXiv:2608.20271, or a pool under 1% of market cap. On a bonding curve the liquidity is the SOL buyers put in, read from the curve price.</p>
+        <p className="text-fg-2 max-w-md">Every verdict is sealed on Concordium before the outcome and graded after it. The forecast is the sealed <span className="mono text-fg">P(rug)</span>; a rug is liquidity down more than 99%, no trades left, the labels of arXiv:2608.20271, or a pool under 1% of market cap. On a bonding curve the liquidity is the SOL buyers put in, read from the curve price. A token with nothing at stake when it was judged is recorded and not scored.</p>
       </div>
 
       {err && <div className="mt-8 rounded-2xl border border-red p-6 mono text-sm text-red">track: {err}</div>}
@@ -40,9 +40,13 @@ export function TrackView() {
         </div>
         {r && <span className="mono text-xs text-fg-4 ml-auto">{r.graded} of {r.verdicts} verdicts graded · {r.pending} waiting</span>}
       </div>
-      {superseded.length > 0 && (
-        <div className="mt-3 mono text-[11px] text-fg-4">
-          labelling rule {r?.rule} is scored here · {superseded.map(x => `${x.graded} ${x.label} grades`).join(", ")} made under rule {superseded[0]!.rule} stay on chain and in the table below but are not mixed into these scores: rule {superseded[0]!.rule} read every priced bonding-curve token as drained and a delisted one as alive
+      {r && (
+        <div className="mt-3 mono text-[11px] text-fg-4 space-y-1">
+          {(sel?.voided ?? 0) > 0 && <div>{sel!.voided} more {sel!.label} grades are void: the token had no buyers&apos; money left in it when it was judged, so there was no outcome to forecast</div>}
+          <div>{r.calibration
+            ? `P(rug) is the judge's score through a calibration fitted on ${r.calibration.n} graded ${horizonLabel(r.calibration.horizon)} outcomes (Platt scaling, a ${r.calibration.a.toFixed(2)}, b ${r.calibration.b.toFixed(2)}), sealed with each verdict${sel?.raw?.brier != null && sel.judge.brier != null ? ` · raw score on the same calls: Brier ${sel.raw.brier.toFixed(3)}` : ""}`
+            : "P(rug) is the judge's score / 100 until 50 outcomes with at least 10 of each kind are graded at 24h; from then on the score is calibrated on the track before it is sealed"}</div>
+          {superseded.length > 0 && <div>labelling rule {r.rule} is scored here · {superseded.reduce((n, x) => n + x.graded, 0)} grades made under rule{new Set(superseded.map(x => x.rule)).size > 1 ? "s" : ""} {[...new Set(superseded.map(x => x.rule))].sort().join(" and ")} stay on chain and in the table below but are not mixed into these scores</div>}
         </div>
       )}
 
@@ -97,6 +101,7 @@ export function TrackView() {
                     {horizons.map(x => {
                       const o = v.outcomes.find(y => y.horizon === x.horizon);
                       if (!o) return <td key={x.horizon} className="text-fg-4">…</td>;
+                      if (o.void) return <td key={x.horizon} title="nothing at stake when judged: not scored" className="text-fg-4">void</td>;
                       const hit = (v.riskScore >= 50) === o.rugged;
                       return <td key={x.horizon} title={o.labels.join(", ") || "alive"} className={o.rugged ? "text-red" : "text-fg"}>{o.rugged ? "RUGGED" : "alive"} <span className={hit ? "text-fg-4" : "text-red"}>{hit ? "✓" : "✗"}</span>{o.liquidityBps != null ? <span className="text-fg-4"> {Math.round(o.liquidityBps / 100)}% liq</span> : null}</td>;
                     })}
